@@ -1,0 +1,47 @@
+# Dependencies and local tooling
+node_modules/
+.npm/
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Secrets and credentials — never commit OAuth/keychain or token stores
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+.copilot/
+
+# Audits of private customer/customer repos and cached model payloads
+.wizard/
+.wizard-pilot/
+.wizard-cache/
+checkpoint*.json
+*.checkpoint.json
+wizard-analysis.json
+wizard-results*.zip
+results-*/
+recovery/
+wizard-proposals/
+wizard-contract-check/
+source-contracts.json
+
+# Generated outputs / ephemeral experiment state
+demo-output/
+demo-output-*/
+demo-design/
+test-run.log
+TEST-RESULTS.txt
+
+
+# Private, generated repair previews (can contain skill excerpts)
+repair-previews.json
+repair-previews.diff
+
+
+# Never commit local Copilot pilot output (can contain model responses)
+wizard-copilot-pilot*.json
+copilot-pilot-results*.json
