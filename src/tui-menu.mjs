@@ -6,14 +6,6 @@ export function overviewActions({hasSemanticReport=false,modelConfigured=false,
   providerPickerEnabled=false,proposalCount=0,modelLabel='not configured',
   canChooseProject=false,canUseDomain=false,projectLabel='current directory'}={}){
   const actions=[];
-  if(canChooseProject)actions.push({
-    id:'project',title:'Scegli il progetto da analizzare',
-    description:'Repository attivo: '+projectLabel+'. Nessuna modifica ai file.'
-  });
-  if(canUseDomain)actions.push({
-    id:'domain',title:'Crea e verifica skill dalle risorse documentali',
-    description:'Leggi le fonti, prepara bozze con citazioni e richiedi revisione umana.'
-  });
   if(hasSemanticReport){
     actions.push({
       id:'results',title:'Esamina i risultati dell’analisi',
@@ -21,7 +13,7 @@ export function overviewActions({hasSemanticReport=false,modelConfigured=false,
     });
   }else if(modelConfigured){
     actions.push({
-      id:'audit',title:'Analizza le skill tecniche con l’AI',
+      id:'audit',title:'Analizza le skill con l’AI',
       description:'Invia le istruzioni e frammenti di codice al modello: '+modelLabel+'.'
     });
   }
@@ -34,6 +26,14 @@ export function overviewActions({hasSemanticReport=false,modelConfigured=false,
   if(providerPickerEnabled)actions.push({
     id:'provider',title:'Cambia modello',
     description:'Seleziona Copilot, Ollama, Codex o Claude Code per questa sessione.'
+  });
+  if(canUseDomain)actions.push({
+    id:'domain',title:'Crea e verifica skill dalle risorse documentali',
+    description:'Leggi fonti, prepara bozze con citazioni e revisionale prima di installarle.'
+  });
+  if(canChooseProject)actions.push({
+    id:'project',title:'Scegli il progetto da analizzare',
+    description:'Repository attivo: '+projectLabel+'. Nessuna modifica ai file.'
   });
   return actions;
 }
