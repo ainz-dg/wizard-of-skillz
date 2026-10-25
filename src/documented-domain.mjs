@@ -21,12 +21,15 @@ function canonicalDirectory(value,label) {
   if(!fs.statSync(resolved).isDirectory())throw Error(label+' must be a directory');
   return resolved;
 }
-function safeOutput(root,out) {
+function safeOutput(root,out,protectedRoots=[]) {
   const target=out?path.resolve(out):fs.mkdtempSync(path.join(os.tmpdir(),'wizard-domain-'));
   if(out) {
     const parent=canonicalDirectory(path.dirname(target),'Output parent');
     const real=path.join(parent,path.basename(target));
-    if(real===root||real.startsWith(root+path.sep))throw Error('Output must be outside the inspected repository');
+    for(const guarded of [root,...protectedRoots]){
+      if(real===guarded||real.startsWith(guarded+path.sep))
+        throw Error('Output must be outside the inspected repository and its resource sources');
+    }
     fs.mkdirSync(real,{mode:0o700});
     return real;
   }
@@ -166,7 +169,10 @@ export async function runDocumentedDomain({root,resources,skills='skills',out=nu
   const skillsPath=path.resolve(base,skills);
   if(skillsPath!==base&&!skillsPath.startsWith(base+path.sep))
     throw Error('Skills directory must be inside the inspected repository');
-  const existing=fs.existsSync(skillsPath)?inventorySkills(skillsPath,{safeRoot:true}):[];
+  const skillsReal=fs.existsSync(skillsPath)?canonicalDirectory(skillsPath,'Skills'):null;
+  if(skillsReal&&skillsReal!==base&&!skillsReal.startsWith(base+path.sep))
+    throw Error('Skills directory resolves outside the inspected repository');
+  const existing=skillsReal?inventorySkills(skillsReal,{safeRoot:true}):[];
   if(docsRoot===skillsPath || docsRoot.startsWith(skillsPath+path.sep) || skillsPath.startsWith(docsRoot+path.sep))
     throw Error('Resources and skills must be separate paths');
   const {docs,skipped,bytes}=walkDocs(docsRoot);
@@ -181,7 +187,7 @@ export async function runDocumentedDomain({root,resources,skills='skills',out=nu
   }):null;
   const review=response?reviewDomainResponse(response,docs,{existingNames:existing.map(s=>s.id)}):
     {candidates:[],existing_reviews:[],issues:[]};
-  const output=safeOutput(base,out);
+  const output=safeOutput(base,out,[docsRoot,...(skillsReal?[skillsReal]:[])]);
   const domainName=path.basename(base);
   const drafts=[];
   for(const c of review.candidates){
