@@ -1,6 +1,6 @@
 # Wizard of Skillz — TUI quickstart
 
-Run `wizard` inside a **disposable repository** containing at least one Agent Skill. It performs an offline structural scan, then opens the human-controlled review. `wizard scan <repo> --out <fresh-directory>` writes a read-only report outside the inspected repository.
+Run `wizard` inside a **disposable repository**. Existing Agent Skills are optional for the documented-domain workflow. It performs an offline structural scan, then opens the human-controlled review. `wizard scan <repo> --out <fresh-directory>` writes a read-only report outside the inspected repository.
 
 ## Navigation
 Use **↑/↓** and **Enter** for the guided overview; **Esc** to return. **L** selects the LLM provider, **K** explicitly requests semantic triage, and **J** displays its evidence report. **M** requests a draft for an eligible UPDATE; **E** opens local editing; **P** displays the prepared preview; **R** prepares supported lifecycle operations. **Space** selects a prepared item. The separate **G**, then **Y** confirmation is required before applying a reviewed write.
