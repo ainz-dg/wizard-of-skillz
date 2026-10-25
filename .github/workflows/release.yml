@@ -1,0 +1,154 @@
+name: Wizard approved release -> npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Version to verify without publishing (e.g. v0.5.0-rc.2)
+        required: true
+        type: string
+      expected_commit:
+        description: Exact full 40-character SHA at main HEAD; dry-run only
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wizard-release-${{ github.event.release.tag_name || inputs.release_tag || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Verify approved commit, tests, pack and clean install
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      artifact_name: ${{ steps.archive.outputs.artifact_name }}
+      tarball_name: ${{ steps.archive.outputs.tarball_name }}
+      sha256: ${{ steps.archive.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Verify release authorization and commit
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: node scripts/release/guard.mjs gate
+
+      - name: Validate candidate package metadata
+        run: node scripts/release/guard.mjs package-check
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run regression tests
+        run: npm test
+
+      - name: Verify package contents
+        run: npm run pack:check
+
+      - name: Create and smoke-test the exact release tarball
+        id: archive
+        run: node scripts/release/guard.mjs pack
+
+      - name: Preserve verified archive for release or approved first-publish bootstrap
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.archive.outputs.artifact_name }}
+          path: |
+            ${{ runner.temp }}/${{ steps.archive.outputs.tarball_name }}
+            ${{ runner.temp }}/release-archive.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  publish:
+    name: Publish exact verified tarball to npm (Trusted Publishing)
+    needs: gate
+    if: ${{ github.event_name == 'release' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Require OIDC-capable npm
+        run: |
+          npm install --global npm@11.5.1
+          npm --version
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.gate.outputs.artifact_name }}
+          path: ${{ runner.temp }}/wizard-verified
+
+      - name: Re-check exact commit, artifact and npm registry identity
+        id: registry-check
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          ARTIFACT_DIR: ${{ runner.temp }}/wizard-verified
+          EXPECTED_SHA256: ${{ needs.gate.outputs.sha256 }}
+        run: |
+          node scripts/release/guard.mjs gate
+          node scripts/release/guard.mjs verify-artifact
+          node scripts/release/guard.mjs prepublish
+
+      - name: Publish through npm Trusted Publishing (no stored token)
+        if: ${{ steps.registry-check.outputs.publish_required == 'true' }}
+        env:
+          TARBALL: ${{ needs.gate.outputs.tarball_name }}
+        run: npm publish "${{ runner.temp }}/wizard-verified/$TARBALL" --access public --tag next --provenance
+
+  verify:
+    name: Verify npm archive and clean registry installation
+    needs: [gate, publish]
+    if: ${{ github.event_name == 'release' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.gate.outputs.artifact_name }}
+          path: ${{ runner.temp }}/wizard-verified
+
+      - name: Confirm published shasum, integrity, CLI and install
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/wizard-verified
+          EXPECTED_SHA256: ${{ needs.gate.outputs.sha256 }}
+        run: node scripts/release/guard.mjs verify-registry

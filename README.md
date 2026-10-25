@@ -4,7 +4,7 @@
 
 A generic, terminal-first, human-controlled assistant for reviewing and maintaining [Agent Skills](https://agentskills.io/).
 
-**Status: pre-release source candidate 0.5.0-rc.2.** This repository contains a clean-history snapshot; validation and publication review are in progress. No official GitHub Release or npm package has been published.
+**Status: unpublished prerelease candidate 0.5.0-rc.3.** This repository contains a clean-history snapshot; validation and publication review are in progress. No official GitHub Release or npm package has been published.
 
 ## Use Wizard: TUI first
 
@@ -30,7 +30,7 @@ node bin/wizard.mjs scan /path/to/disposable-project
 
 With no arguments, `wizard` scans the current directory locally and starts the TUI on an interactive terminal. For first runs use a **disposable project**, not sensitive or production source.
 
-## Resources-first documented domains (experimental)
+## Resources-first documented domains (EXPERIMENTAL)
 
 You can create review-only candidate Agent Skills from an explicitly selected documentation
 folder, even when no skills exist yet. For an interactive setup:
@@ -59,7 +59,9 @@ Domain resources currently support MD, TXT, YAML and JSON only — not PDF or DO
 `--llm` is explicit and may disclose selected local documents to the
 configured provider. No generated skill is automatically installed or approved.
 See [domain guide](docs/DOCUMENTED-DOMAIN.md) and
-[account-backed providers](docs/ACCOUNT-PROVIDERS.md).
+[EXPERIMENTAL account-backed providers](docs/ACCOUNT-PROVIDERS.md).
+Account-backed Codex and Claude Code adapters have simulated CI tests but still
+require real-account smoke tests and compliance with each provider's terms.
 
 After an approved npm prerelease is published with the `next` dist-tag, users will be able to run:
 
@@ -79,4 +81,4 @@ See [TUI quickstart](docs/TUI-QUICKSTART.md), [LLM provider and Ollama setup](do
 
 ## Open source readiness
 
-**License:** [Apache License 2.0](LICENSE). The candidate remains `private: true` in `package.json` to prevent accidental npm publication during review. The proposed release process is documented in [docs/RELEASING.md](docs/RELEASING.md). No merge, repository visibility change, GitHub Release, or npm publication is authorized by the presence of these files.
+**License:** [Apache License 2.0](LICENSE). Candidate `0.5.0-rc.3` is prepared for a human-approved first npm publish; this repository currently has **no published official GitHub Release or npm version**. The release workflow does not publish on merge: only the owner's published GitHub Release can trigger npm publication, after preflight gates and initial npm account setup. See [release guide](docs/RELEASING.md) and [prerelease notes](docs/releases/0.5.0-rc.3.md).

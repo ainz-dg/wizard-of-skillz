@@ -1,7 +1,6 @@
 {
   "name": "wizard-of-skillz",
-  "version": "0.5.0-rc.2",
-  "private": true,
+  "version": "0.5.0-rc.3",
   "type": "module",
   "bin": {
     "wizard": "./bin/wizard.mjs"
@@ -22,7 +21,9 @@
     "prompts/",
     "docs/TUI-QUICKSTART.md",
     "docs/OLLAMA.md",
-    "docs/ACKNOWLEDGEMENTS.md"
+    "docs/ACKNOWLEDGEMENTS.md",
+    "docs/DOCUMENTED-DOMAIN.md",
+    "docs/ACCOUNT-PROVIDERS.md"
   ],
   "description": "Human-controlled, evidence-first Agent Skills maintenance CLI/TUI.",
   "license": "Apache-2.0",
@@ -45,5 +46,6 @@
   "publishConfig": {
     "access": "public",
     "tag": "next"
-  }
+  },
+  "private": false
 }
