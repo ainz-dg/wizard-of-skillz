@@ -277,7 +277,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
       fmt('Indica la directory del repository da esaminare.','bold'),
       fmt('Puoi scegliere un progetto senza uscire dal Mago.','gray'),
       '',
-      fmt('Repository attuale: '+(projectRoot??'non selezionato'),'gray'),
+      fmt('Repository attuale: '+(projectRoot?path.basename(projectRoot)+' · '+projectRoot:'non selezionato'),'gray'),
       fmt('Percorso (assoluto o relativo alla cartella corrente):','bold'),
       fmt('> '+(w.text||'(Invio = repository attuale)'),'cyan'),
       '',
@@ -370,7 +370,8 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
       }),{height,width,fmt});
     }
     lines.push(
-      fmt('Repository: '+(projectRoot??catalog.source_repositories?.consumer??'locale'),'gray'),
+      fmt('Repository: '+(projectRoot?path.basename(projectRoot)+' · '+projectRoot:
+        catalog.source_repositories?.consumer??'locale'),'gray'),
       fmt((localScan?localScan.skill_count+' skill individuate':'Proposte strutturali: '+items.length)+
         '  ·  Proposte: '+items.length,'bold')
     );
