@@ -1,14 +1,14 @@
 {
   "name": "wizard-of-skillz",
-  "version": "0.5.0-rc.2",
-  "private": true,
+  "version": "0.5.0-rc.3",
   "type": "module",
   "bin": {
     "wizard": "./bin/wizard.mjs"
   },
   "scripts": {
     "test": "node --test",
-    "pack:check": "npm pack --dry-run --json"
+    "pack:check": "npm pack --dry-run --json",
+    "release:check": "node scripts/release/guard.mjs package-check"
   },
   "engines": {
     "node": ">=22.12.0"
@@ -22,7 +22,9 @@
     "prompts/",
     "docs/TUI-QUICKSTART.md",
     "docs/OLLAMA.md",
-    "docs/ACKNOWLEDGEMENTS.md"
+    "docs/ACKNOWLEDGEMENTS.md",
+    "docs/DOCUMENTED-DOMAIN.md",
+    "docs/ACCOUNT-PROVIDERS.md"
   ],
   "description": "Human-controlled, evidence-first Agent Skills maintenance CLI/TUI.",
   "license": "Apache-2.0",
