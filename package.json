@@ -7,8 +7,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "pack:check": "npm pack --dry-run --json",
-    "release:check": "node scripts/release/guard.mjs package-check"
+    "pack:check": "npm pack --dry-run --json"
   },
   "engines": {
     "node": ">=22.12.0"
