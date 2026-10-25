@@ -20,6 +20,7 @@ import { evaluatePairedAgentOutputs } from '../src/paired-agent-eval.mjs';
 import { buildReviewCatalog, planHumanSelection, renderReviewMarkdown } from '../src/review-selection.mjs';
 import {runReviewTui} from '../src/review-tui.mjs';
 import {createLocalScan} from '../src/local-scan.mjs';
+import {runDocumentedDomain} from '../src/documented-domain.mjs';
 import {generateUpdateDraft,editUpdateDraft} from '../src/update-drafting.mjs';
 import {stageLifecycle} from '../src/skill-lifecycle.mjs';
 import {stageUpdateCandidate} from '../src/review-candidates.mjs';
@@ -88,6 +89,7 @@ if (['-h','--help','help'].includes(cmd)) {
 Commands:
   wizard (no arguments)                 scan current directory locally; open TUI if terminal
   scan [repo] [--out new-directory]  local scan; L choose Copilot/Ollama in TUI; M explicit drafting
+  domain <repo> --resources <dir> [--skills skills] [--out new-directory] [--llm]  document-grounded draft skills (review only)
   tui <audit-output-dir> --consumer-root repo [--provider-root repo] [--move-dir /local/skills]  review; L select LLM; M draft; G/Y Apply
   stage-update <audit-output-dir> --proposal ID --consumer-root repo --from-file revised-SKILL.md  stage existing revision
   stage-action <audit-output-dir> --proposal ID --consumer-root repo [--from-file new-SKILL.md] [--destination-dir /local/skills]  stage lifecycle
@@ -201,6 +203,20 @@ async function llmAnalysis({consumerRoot, providerRoot, consumerId, providerId, 
       version: wizardVersion
     }
   };
+}
+
+if (cmd === 'domain') {
+  const root=positional(1)??fail('domain requires a repository path');
+  const resources=arg('--resources')??fail('domain requires explicit --resources <directory>');
+  const skills=arg('--skills','skills');
+  let client=null;
+  try {
+    if(has('--llm'))client=makeLlmClient();
+    const result=await runDocumentedDomain({root,resources,skills,out:arg('--out'),client});
+    console.log(JSON.stringify(result,null,2));
+  }catch(error){fail('Domain analysis failed: '+error.message);}
+  finally{if(client)await closeLlmClient(client);}
+  process.exit(0);
 }
 
 if (!cmd || cmd === 'scan') {
