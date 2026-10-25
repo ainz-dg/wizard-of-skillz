@@ -286,7 +286,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
     if(w.notice)projectLines.push(fmt(w.notice,'yellow'));
     return pinCommandHints(projectLines,[
       'Digita percorso  INVIO Apri  BACKSPACE Cancella',
-      'ESC Torna al menu  ·  Q Esci'
+      'ESC Torna al menu  ·  Ctrl+C Esci'
     ],{height,width,fmt});
   }
   if(domainWizard){
@@ -340,7 +340,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
       for(const row of body.slice(pos,pos+visible))domainLines.push(fmt(row,'bold'));
     }
     const hints=w.step==='resources'||w.step==='skills'?
-      ['Digita percorso  INVIO Conferma  BACKSPACE Cancella','ESC Indietro · Q Esci']:
+      ['Digita percorso  INVIO Conferma  BACKSPACE Cancella','ESC Indietro · Ctrl+C Esci']:
       w.step==='review'?['M Genera bozze  L Provider  ESC Percorsi','Nessuna scrittura nelle skill · Q Esci']:
       w.step==='confirm'?['Y Invia le fonti al modello  ESC Annulla','Non inviare dati riservati a provider non autorizzati']:
       w.step==='result'?['↑↓ Scegli  INVIO Leggi bozza  ESC Menu','Bozze da approvare, non installate']:
@@ -846,7 +846,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
   };
   const projectKey=(ch,command)=>{
     if(command==='escape'){projectWizard=null;return;}
-    if(command==='q'){finish();return;}
+    // While typing a path, q is part of the text, not the Quit shortcut.
     if(command==='backspace')projectWizard={...projectWizard,text:projectWizard.text.slice(0,-1),notice:''};
     else if(command==='enter')chooseProject();
     else if(typeof ch==='string'&&ch.length===1&&!/[\x00-\x1f\x7f]/.test(ch)
@@ -893,7 +893,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
   };
   const domainKey=(ch,command)=>{
     const w=domainWizard;
-    if(command==='q'){finish();return;}
+    if(command==='q'&&!['resources','skills'].includes(w.step)){finish();return;}
     if(command==='escape'){
       if(w.step==='resources'||w.step==='result'){domainWizard=null;}
       else if(w.step==='skills')domainWizard={...w,step:'resources',text:w.resources};
