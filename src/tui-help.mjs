@@ -21,12 +21,12 @@ export function commandHints(view,{
   if(view==='overview')
     return narrow?[
       '↑↓ Scegli  INVIO Apri  ? Aiuto',
-      'L Modello  K Audit  Q Esci'
+      'D Dominio  L Modello  K Audit  Q Esci'
     ]:[
       '↑↓ Scegli un’azione  INVIO Seleziona'+
         (hasSemanticReport?'  J Risultati':modelConfigured?'  K Audit':'')+
         (providerPickerEnabled?'  L Provider':''),
-      '? Aiuto  Q Esci  ·  Solo G → Y può applicare le modifiche'
+      'D Dominio  ? Aiuto  Q Esci  ·  Solo G → Y può applicare le modifiche'
     ];
   if(view==='list'){
     if(searching)return [
@@ -81,6 +81,7 @@ export const HELP_LINES=[
   'COME FUNZIONA',
   '1. SCANSIONE: il comando wizard scan controlla struttura e link senza modelli.',
   '2. ANALISI: L sceglie il provider AI; K invia le claim e gli snippet al modello.',
+  '   D dal menu: scegli resources e skills, M prepara una richiesta, Y autorizza invio AI.',
   '3. VERIFICA: J apre gli esiti; una citazione valida non dimostra un errore.',
   '4. PROPOSTA DI MODIFICA: M chiede all’AI un SKILL.md completo rivisto (solo UPDATE).',
   '   E permette una modifica con editor; P mostra il diff. Nessuna scrittura nel progetto.',
@@ -89,7 +90,7 @@ export const HELP_LINES=[
   '',
   'SCORCIATOIE AVANZATE',
   'H/C diagnosi separate · F filtro · / ricerca · X pulisci ricerca.',
-  'A/N/I selezione · D/U scarta/ripristina · S salva sessione · R MOVE/REMOVE.',
+  'A/N/I selezione · D/U scarta/ripristina in lista · S salva sessione · R MOVE/REMOVE.',
   'Q esce · ESC torna indietro. Comandi disponibili solo nella vista pertinente.',
   'La selezione NON autorizza Apply: G → Y è sempre una decisione separata.'
 ];
@@ -100,6 +101,7 @@ export function contextualHelp(view){
       return [
         'QUI: ↑↓ sceglie fra analizzare, esaminare le proposte e cambiare modello.',
         'INVIO attiva l’azione evidenziata; K, J e L restano scorciatoie.',
+        'D apre il percorso documentale: resources, modello e bozze da approvare.',
         'Non serve ricordare i tasti per utilizzare il Mago.'
       ];
     case 'list':
