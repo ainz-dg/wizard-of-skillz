@@ -177,6 +177,8 @@ export async function runDocumentedDomain({root,resources,skills='skills',out=nu
     throw Error('Resources and skills must be separate paths');
   const {docs,skipped,bytes}=walkDocs(docsRoot);
   if(!docs.length)throw Error('No eligible resource documents to inspect');
+  // Validate the destination before any optional remote model request.
+  const output=safeOutput(base,out,[docsRoot,...(skillsReal?[skillsReal]:[])]);
   const response=client?await client.completeJson({
     system:DOCUMENTED_DOMAIN_PROMPT,
     user:JSON.stringify({
@@ -187,7 +189,6 @@ export async function runDocumentedDomain({root,resources,skills='skills',out=nu
   }):null;
   const review=response?reviewDomainResponse(response,docs,{existingNames:existing.map(s=>s.id)}):
     {candidates:[],existing_reviews:[],issues:[]};
-  const output=safeOutput(base,out,[docsRoot,...(skillsReal?[skillsReal]:[])]);
   const domainName=path.basename(base);
   const drafts=[];
   for(const c of review.candidates){
