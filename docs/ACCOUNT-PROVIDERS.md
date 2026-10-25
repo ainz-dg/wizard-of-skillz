@@ -20,9 +20,11 @@ For Claude Code:
     node bin/wizard.mjs probe --llm-provider claude-code-account
 
 Codex runs exec in an isolated temporary working directory with a read-only
-sandbox and no repository checkout. Claude Code runs with builtin tools and MCP
-tools disabled, no session persistence and no custom skills. Both get only the
-explicit Wizard prompt, not the full repository by default.
+sandbox and no repository checkout. Codex retains its built-in read-only tools;
+the wrapper does not grant writes but cannot promise filesystem read isolation
+outside that sandbox. Claude Code runs with built-in and MCP tools disabled,
+no session persistence and no custom skills. Both receive only the explicit
+Wizard prompt, not the full repository by default.
 
 **Provider policy:** an authenticated session is not a guarantee of entitlement
 or free usage. Anthropic restricts third-party apps from collecting or
@@ -35,8 +37,8 @@ This integration does not embed Sign in with ChatGPT (SIWC); instead it uses
 the documented local Codex CLI authenticated via the user account. A native
 SIWC integration can follow when its SDK deployment is verified.
 
-The transport deliberately does not grant filesystem write permissions or
-tools during inference. It does NOT imply that model output or any requested
+The transport does not grant filesystem write permissions. Claude tools are
+disabled; Codex remains limited to its read-only sandbox. It does NOT imply that model output or any requested
 change is automatically authorized.
 
 Provider login/probe against real accounts are not exercised in public CI
