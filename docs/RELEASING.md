@@ -4,11 +4,11 @@
 This workflow is for the generic open-source Wizard project, not smeup's
 private skill distribution or governance. Only the owner publishes releases.
 
-## Current prerelease candidate
+## Current prerelease candidate — first OIDC publish
 
 - Package: `wizard-of-skillz`
-- Candidate: `0.5.0-rc.3`
-- Release tag: `v0.5.0-rc.3`
+- Candidate: `0.5.0-rc.4`
+- Release tag: `v0.5.0-rc.4`
 - npm dist-tag: `next`; never `latest` for this prerelease
 - Features: software skill reviews (existing), TUI-first project selection
   (new), documented-domain resource proposals (experimental), account-backed
@@ -36,26 +36,25 @@ automatic PR merges, and no private release repository dependencies.
 
 1. Merge the reviewed release pipeline PR only when CI is green.
 2. In GitHub Actions choose **Wizard approved release -> npm** > Run workflow.
-3. Supply `release_tag = v0.5.0-rc.3` and the **full 40-character
+3. Supply `release_tag = v0.5.0-rc.4` and the **full 40-character
    current main SHA** as `expected_commit`. Select branch `main`.
 4. The dry-run checks package metadata, committed HEAD against current main,
    tests, package files, exact archive and a fresh tarball installation.
-5. Download the workflow artifact named `wizard-release-0.5.0-rc.3`.
-   It contains `wizard-of-skillz-0.5.0-rc.3.tgz` and `release-archive.json`.
+5. Download the workflow artifact named `wizard-release-0.5.0-rc.4`.
+   It contains `wizard-of-skillz-0.5.0-rc.4.tgz` and `release-archive.json`.
    Inspect files and verify SHA-256 against the manifest. Do not publish without
    an explicit owner decision and completed source/security/manual TUI review.
 
 **Dry-run does not call npm publish and cannot publish accidentally.**
 
-## One-time npm initialization (new package only)
+## Historical one-time npm initialization (completed for rc.3)
 
-As of October 2026, npm does **not** allow configuring a Trusted Publisher on a
-name that has not yet been created on the registry. Verify the name directly on
-the registry and verify the account has publishing rights. If it is taken,
-STOP and select a different name through a reviewed package change.
+`0.5.0-rc.3` was already created on npm and verified by the GitHub Release
+workflow. The manual initialization documented below is **historical**: do not
+repeat it for `0.5.0-rc.4`. The upcoming release must exercise OIDC publishing.
 
-For the **first** release only, the owner downloads the exact tarball produced
-by the green dry-run; on their own machine, with npm 2FA:
+For reference, the first release used the exact verified tarball and the
+owner's npm account with 2FA:
 
 
 ```sh
@@ -69,16 +68,14 @@ This manual npm bootstrap is an exceptional owner action. It uses the same
 verified archive, not a repackaged local tree. Do not request or store npm
 passwords, OTPs, or write tokens in GitHub Actions.
 
-After the bootstrap, the owner may publish GitHub Release
-`v0.5.0-rc.3`, marked as **Pre-release** and using
-`docs/releases/0.5.0-rc.3.md` as notes. The release
-workflow detects the **identical** npm archive and skips the duplicate publish,
-then verifies the npm registry shasum, integrity and CLI install. If the
-existing archive is DIFFERENT, it fails closed.
+The owner then published the `v0.5.0-rc.3` GitHub prerelease. The completed
+workflow detected the matching npm archive, skipped duplicate publication and
+verified integrity and clean installation. Mismatched archives fail closed.
 
-Configure the first **npm Trusted Publisher** when the NEXT npm version is
-ready to publish, so validation happens within npm's 2-day activation window.
-Package Settings -> Trusted publishing -> GitHub Actions:
+For `rc.4`, the owner reports that **npm Trusted Publishing** has been configured.
+Its first successful OIDC publish must occur within two days of configuration.
+The actual permissions and identity will be validated by the release run.
+Reconfirm Package Settings -> Trusted publishing -> GitHub Actions:
 - Owner: `ainz-dg`
 - Repository: `wizard-of-skillz`
 - Workflow filename: `release.yml`
@@ -86,10 +83,11 @@ Package Settings -> Trusted publishing -> GitHub Actions:
 - **Allow direct npm publish**: enable explicitly. New publisher registrations
   grant staging by default, not direct publish.
 
-For the next version, repeat review / dry-run / Git tag / Pre-release publish.
-When the GitHub Release is published, GitHub Actions now publishes to npm via
-OIDC, then verifies archive identity and an isolated install. Prefer
-restricting token-based publishing after successful OIDC validation.
+For `rc.4`, repeat review / dry-run / Git tag / Pre-release publish. The GitHub
+Release must cause a **real** npm publish via OIDC (the publish step must not
+be skipped), and the verify job must confirm archive identity and a clean
+registry install. After this succeeds, consider restricting token-based
+publishing. Do not claim OIDC validation based only on a green `rc.3` run.
 
 Docs: https://docs.npmjs.com/trusted-publishers/
 

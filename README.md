@@ -4,7 +4,7 @@
 
 A generic, terminal-first, human-controlled assistant for reviewing and maintaining [Agent Skills](https://agentskills.io/).
 
-**Status: unpublished prerelease candidate 0.5.0-rc.3.** This repository contains a clean-history snapshot; validation and publication review are in progress. No official GitHub Release or npm package has been published.
+**Status:** `0.5.0-rc.3` is published as an experimental prerelease. `0.5.0-rc.4` is a release-engineering candidate to validate automatic npm publication through GitHub OIDC; no new product features are included.
 
 ## Use Wizard: TUI first
 
@@ -15,7 +15,7 @@ and offers guided paths to choose another repository, analyze existing skills,
 review documented-domain sources, examine proposals and select an AI provider.
 Choosing resources never requires a separate CLI command.
 
-## Try locally (before release)
+## Try Wizard
 
 Requires Node.js 22.12 or later. In a clean checkout:
 
@@ -63,13 +63,13 @@ See [domain guide](docs/DOCUMENTED-DOMAIN.md) and
 Account-backed Codex and Claude Code adapters have simulated CI tests but still
 require real-account smoke tests and compliance with each provider's terms.
 
-After an approved npm prerelease is published with the `next` dist-tag, users will be able to run:
+Install or run the current experimental prerelease from npm:
 
 ```sh
 npx wizard-of-skillz@next
 ```
 
-This command is not available until npm publication is actually completed.
+The `next` dist-tag follows the currently approved experimental prerelease. Pin a specific version for repeatable installations.
 
 ## How it works
 
@@ -81,4 +81,4 @@ See [TUI quickstart](docs/TUI-QUICKSTART.md), [LLM provider and Ollama setup](do
 
 ## Open source readiness
 
-**License:** [Apache License 2.0](LICENSE). Candidate `0.5.0-rc.3` is prepared for a human-approved first npm publish; this repository currently has **no published official GitHub Release or npm version**. The release workflow does not publish on merge: only the owner's published GitHub Release can trigger npm publication, after preflight gates and initial npm account setup. See [release guide](docs/RELEASING.md) and [prerelease notes](docs/releases/0.5.0-rc.3.md).
+**License:** [Apache License 2.0](LICENSE). The [first experimental release, `0.5.0-rc.3`](https://github.com/ainz-dg/wizard-of-skillz/releases/tag/v0.5.0-rc.3), was published on npm with a one-time manual bootstrap and verified by GitHub Actions. Candidate `0.5.0-rc.4` validates the first **automatic** npm Trusted Publishing flow using GitHub OIDC, without adding features. Merges never publish: the owner must explicitly publish a GitHub prerelease. See the [release guide](docs/RELEASING.md) and [rc.4 notes](docs/releases/0.5.0-rc.4.md).
