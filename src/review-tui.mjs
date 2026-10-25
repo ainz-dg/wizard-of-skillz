@@ -236,6 +236,8 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
       lines.push(fmt('1  GitHub Copilot (login federato)','bold'),
         fmt('2  Ollama locale · http://127.0.0.1:11434','bold'),
         fmt('3  Ollama remoto · server scelto da te','bold'),
+        fmt('4  OpenAI · account Codex CLI già autenticato','bold'),
+        fmt('5  Anthropic · Claude Code CLI già autenticato','bold'),
         '');
     }else if(providerWizard.step==='url'){
       lines.push(fmt('Indirizzo server Ollama remoto (es. http://host:11434/v1)','bold'),
@@ -782,6 +784,9 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         providerWizard={...providerWizard,step:'model',text:
           providerSelection.provider==='ollama'?providerSelection.model??'':'',
           draft:{provider:'ollama',baseUrl:LOCAL_OLLAMA_URL,model:''}};
+      }else if(command==='4'||command==='5'){
+        providerWizard={...providerWizard,draft:{provider:command==='4'?'codex-account':'claude-code-account',model:''}};
+        acceptProvider();
       }else if(command==='3'){
         providerWizard={...providerWizard,step:'url',
           text:providerSelection.provider==='ollama' &&

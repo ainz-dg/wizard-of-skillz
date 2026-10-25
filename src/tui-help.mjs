@@ -8,7 +8,7 @@ export function commandHints(view,{
   proposalCount=0,twoPane=false,wizardStep=null
 }={}){
   if(wizardStep==='menu')
-    return ['1 Copilot  2 Ollama locale  3 Ollama remoto',
+    return ['1 Copilot  2 Ollama locale  3 Ollama remoto  4 Codex  5 Claude',
       'ESC Annulla scelta'];
   if(wizardStep==='model')
     return ['INVIO Conferma modello  TAB Elenca modelli','ESC Annulla scelta'];
@@ -80,7 +80,7 @@ export function commandHints(view,{
 export const HELP_LINES=[
   'COME FUNZIONA',
   '1. SCANSIONE: il comando wizard scan controlla struttura e link senza modelli.',
-  '2. ANALISI: L sceglie Copilot/Ollama; K invia le claim e gli snippet al modello.',
+  '2. ANALISI: L sceglie il provider AI; K invia le claim e gli snippet al modello.',
   '3. VERIFICA: J apre gli esiti; una citazione valida non dimostra un errore.',
   '4. PROPOSTA DI MODIFICA: M chiede all’AI un SKILL.md completo rivisto (solo UPDATE).',
   '   E permette una modifica con editor; P mostra il diff. Nessuna scrittura nel progetto.',

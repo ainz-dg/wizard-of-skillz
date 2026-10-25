@@ -1,6 +1,7 @@
 import { clientFromEnv as openAICompatibleFromEnv } from './llm-client.mjs';
 import { CopilotCloudClient } from './copilot-client.mjs';
 import { OllamaClient } from './ollama-client.mjs';
+import { AccountCliClient } from './account-cli-client.mjs';
 
 function boolEnv(value) {
   return /^(1|true|yes)$/i.test(String(value ?? ''));
@@ -10,6 +11,12 @@ export function createLlmClient(overrides = {}) {
   const provider = overrides.provider ?? process.env.WIZARD_LLM_PROVIDER ?? 'copilot';
   const model = overrides.model ?? process.env.WIZARD_LLM_MODEL ?? (provider === 'copilot' ? 'auto' : undefined);
   const timeoutMs = Number(overrides.timeoutMs ?? process.env.WIZARD_LLM_TIMEOUT_MS ?? 120000);
+
+  if (provider === 'codex-account' || provider === 'claude-code-account') {
+    return new AccountCliClient({
+      provider,model,timeoutMs,run:overrides.cliRun
+    });
+  }
 
   if (provider === 'copilot') {
     return new CopilotCloudClient({

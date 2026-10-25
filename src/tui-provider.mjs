@@ -13,6 +13,8 @@ export function initialProviderSelection(options={}){
 export function providerDescription(config){
   if(!config)return 'non configurato';
   if(config.provider==='copilot')return 'Copilot · '+(config.model||'auto');
+  if(config.provider==='codex-account')return 'OpenAI via Codex CLI · account locale';
+  if(config.provider==='claude-code-account')return 'Anthropic via Claude Code CLI · account locale';
   if(config.provider==='ollama'){
     const url=config.baseUrl||LOCAL_OLLAMA_URL;
     const local=url==='http://127.0.0.1:11434/v1'||
@@ -25,9 +27,9 @@ export function providerDescription(config){
 }
 
 export function validateProviderSelection(config,{needsModel=true}={}){
-  if(!config||!['copilot','ollama','openai-compatible'].includes(config.provider))
+  if(!config||!['copilot','ollama','openai-compatible','codex-account','claude-code-account'].includes(config.provider))
     throw Error('Provider non supportato');
-  if(needsModel&&(!config.model||typeof config.model!=='string'||!config.model.trim()))
+  if(needsModel&&!['codex-account','claude-code-account'].includes(config.provider)&&(!config.model||typeof config.model!=='string'||!config.model.trim()))
     throw Error('Seleziona un modello prima di usare M');
   if(config.provider==='ollama'||config.provider==='openai-compatible'){
     if(typeof config.baseUrl!=='string'||!config.baseUrl.trim())
