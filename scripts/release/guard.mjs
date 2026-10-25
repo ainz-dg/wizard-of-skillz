@@ -135,12 +135,25 @@ async function registryMetadata(pkg,version){
   if(!res.ok)throw Error('npm registry returned HTTP '+res.status);
   return res.json();
 }
-async function registryVacant(){
+export function alreadyPublishedIdentity(existing,record){
+  if(!existing)return {publishRequired:true};
+  assert.equal(existing.name,record.package,'Registry package identity mismatch');
+  assert.equal(existing.version,record.version,'Registry version identity mismatch');
+  assert.equal(existing.dist?.shasum,record.shasum,
+    'Existing npm version uses different bytes (shasum); manual intervention required');
+  assert.equal(existing.dist?.integrity,record.integrity,
+    'Existing npm version integrity differs; manual intervention required');
+  return {publishRequired:false};
+}
+async function publishPreflight(){
   ensureEvent();
-  const pkg=currentPackage();
-  const existing=await registryMetadata(pkg.name,pkg.version);
-  assert.equal(existing,null,'This npm package version already exists; refuse republish');
-  console.log('Version not published; npm credentials will be supplied via GitHub OIDC.');
+  const record=verifyStoredArtifact(process.env.ARTIFACT_DIR,process.env.EXPECTED_SHA256);
+  const existing=await registryMetadata(record.package,record.version);
+  const decision=alreadyPublishedIdentity(existing,record);
+  reportOutput({publish_required:String(decision.publishRequired)});
+  console.log(decision.publishRequired?
+    'Version not published: OIDC publish required.':
+    'Exact verified version already on npm (manual first-publish bootstrap); no duplicate publish.');
 }
 async function registryVerify(){
   const record=verifyStoredArtifact(process.env.ARTIFACT_DIR,process.env.EXPECTED_SHA256);
@@ -179,7 +192,7 @@ if(cmd){
     else if(cmd==='verify-artifact'){
       const record=verifyStoredArtifact(process.env.ARTIFACT_DIR,process.env.EXPECTED_SHA256);
       console.log('Archive verified: '+record.tarball);
-    }else if(cmd==='prepublish')await registryVacant();
+    }else if(cmd==='prepublish')await publishPreflight();
     else if(cmd==='verify-registry')await registryVerify();
     else throw Error('Unknown release-guard command '+cmd);
   }catch(error){console.error('RELEASE BLOCKED:',error.message);process.exitCode=1;}
