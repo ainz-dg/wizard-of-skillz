@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {validateMetadata,validateArchiveInfo,verifyStoredArtifact}
+import {validateMetadata,validateArchiveInfo,verifyStoredArtifact,alreadyPublishedIdentity}
   from '../scripts/release/guard.mjs';
 
 const SHA='a'.repeat(40);
@@ -67,4 +67,17 @@ test('exact release bytes must match previous immutable sha256 job output',t=>{
   assert.throws(()=>verifyStoredArtifact(dir,'0'.repeat(64)),/upstream gate/);
   fs.writeFileSync(path.join(dir,file),'tampered');
   assert.throws(()=>verifyStoredArtifact(dir,hash),/bytes changed/);
+});
+
+test('first npm bootstrap can be recognized only for byte-identical archives',()=>{
+  const release={package:'wizard-of-skillz',version:'0.5.0-rc.3',
+    shasum:'f'.repeat(40),integrity:'sha512-example'};
+  const existing={name:release.package,version:release.version,
+    dist:{shasum:release.shasum,integrity:release.integrity}};
+  assert.deepEqual(alreadyPublishedIdentity(null,release),{publishRequired:true});
+  assert.deepEqual(alreadyPublishedIdentity(existing,release),{publishRequired:false});
+  assert.throws(()=>alreadyPublishedIdentity({...existing,
+    dist:{...existing.dist,shasum:'b'.repeat(40)}},release),/different bytes/);
+  assert.throws(()=>alreadyPublishedIdentity({...existing,
+    dist:{...existing.dist,integrity:'sha512-mismatched'}},release),/integrity differs/);
 });
