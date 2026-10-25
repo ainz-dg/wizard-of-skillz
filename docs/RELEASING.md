@@ -1,36 +1,107 @@
-# Release checklist (maintainer)
+# Releasing Wizard of Skillz
 
-This is a **preparation checklist**, not automation or permission to publish. Wizard is a personal, provider-agnostic project. Do not import company-specific files or historical Git history into the public repository.
+**Human-controlled release, automated verification and npm publication.**
+This workflow is for the generic open-source Wizard project, not smeup's
+private skill distribution or governance. Only the owner publishes releases.
 
-## 1. Verify exact candidate
+## Current prerelease candidate
 
-- Record the release candidate commit SHA. Test that precise checkout on Node 22 (>=22.12) and 24, on Linux and ideally macOS.
-- Run `npm ci --no-audit --no-fund`, `npm test`, `npm run pack:check`, `node bin/wizard.mjs --version`, and `node bin/wizard.mjs --help`.
-- On a disposable synthetic repository, exercise local scan, review, proposal preparation, separate Apply confirmation, stale-hash checks, symlinks/path traversal, CREATE/UPDATE/MOVE/REMOVE, backup and failure rollback.
-- Verify the TUI interactively via a PTY at 120×30, 100×24, 90×20, 80×16 and 60×12. Include no-color fallback and confirmation/navigation.
-- Inspect the complete `npm pack --dry-run --json` file list, then make a real tarball locally and install it in a **disposable** location. Validate the installed `wizard` executable. Ensure no secrets, historical corporate artifacts, fixture/internal audit files or unintended test data appear in the tarball.
-- Audit the new repository's complete Git history, license/attribution, Copilot SDK dependencies and remote provider handling. In particular, verify any source-derived Matt Pocock wording against its MIT terms.
-- Confirm that GitHub private vulnerability reporting is actually enabled, or establish another verified private security contact. Do not claim an unsupported SLA.
+- Package: `wizard-of-skillz`
+- Candidate: `0.5.0-rc.3`
+- Release tag: `v0.5.0-rc.3`
+- npm dist-tag: `next`; never `latest` for this prerelease
+- Features: software skill reviews (existing), TUI-first project selection
+  (new), documented-domain resource proposals (experimental), account-backed
+  Codex/Claude Code CLI providers (experimental; require local real-account
+  verification)
+- PDF/DOCX resources, external source connectors, and automatic installation
+  of proposed skills are NOT part of this candidate.
 
-GitHub Actions jobs that terminate without steps do not count as test results. Do not infer a PASS from previous repositories.
+## Release flow
 
-## 2. Prepare npm and GitHub
+Code review and CI -> merge to main -> explicit owner decision -> verify
+exact commit -> tag/Publish GitHub Release -> Actions release.yml -> npm via
+Trusted Publishing (OIDC) -> registry integrity and clean-install smoke.
 
-- Verify `wizard-of-skillz` is still available **directly against the npm registry**; a search result or missing public page alone is insufficient.
-- Choose the exact public prerelease version and Git tag; current proposal: `0.5.0-rc.2` with npm tag `next`.
-- Preserve the source/package GitHub URL and confirm public README, licence and acknowledgements agree.
-- The candidate intentionally has `private: true`. **Only after testing, the maintainer's explicit approval and npm account verification**, remove that field on a dedicated publishable commit and re-test/re-inspect the exact commit/tarball.
-- If using npm trusted publishing, configure it in npm with the exact GitHub workflow and use a public GitHub-hosted Actions run. As of October 2026, it requires npm CLI >=11.5.1 and Node >=22.14; the existing CI must first run successfully. See <https://docs.npmjs.com/trusted-publishers/>.
-- Otherwise a maintainer may choose a directly authenticated manual publish, subject to npm account security and explicit authorization. Do not store persistent npm tokens in the repo.
+Merging or pushing to main NEVER publishes on npm. A draft GitHub Release
+does not publish either. The trigger is **Release: published**, and the
+published prerelease must point to the exact current main commit.
 
-## 3. Final human approval (separate from code review)
+No stored npm publish tokens. `release.yml` grants
+`id-token: write` to the npm publishing job only. No legacy 2FA
+bypass, no force push, no republishing existing mismatched versions, no
+automatic PR merges, and no private release repository dependencies.
 
-After all checks pass, ask the maintainer to authorize **each** operation: merging reviewed PR(s), changing GitHub repository visibility, creating the Git tag/GitHub Release and publishing on npm. None of these actions are performed by this checklist. Public npm publication is not reversible in the same way as a Git branch.
+## Verify the exact prepared commit (no publish)
 
-For a maintainer-authorized manual prerelease only, the intended npm command is:
+1. Merge the reviewed release pipeline PR only when CI is green.
+2. In GitHub Actions choose **Wizard approved release -> npm** > Run workflow.
+3. Supply `release_tag = v0.5.0-rc.3` and the **full 40-character
+   current main SHA** as `expected_commit`. Select branch `main`.
+4. The dry-run checks package metadata, committed HEAD against current main,
+   tests, package files, exact archive and a fresh tarball installation.
+5. Download the workflow artifact named `wizard-release-0.5.0-rc.3`.
+   It contains `wizard-of-skillz-0.5.0-rc.3.tgz` and `release-archive.json`.
+   Inspect files and verify SHA-256 against the manifest. Do not publish without
+   an explicit owner decision and completed source/security/manual TUI review.
+
+**Dry-run does not call npm publish and cannot publish accidentally.**
+
+## One-time npm initialization (new package only)
+
+As of October 2026, npm does **not** allow configuring a Trusted Publisher on a
+name that has not yet been created on the registry. Verify the name directly on
+the registry and verify the account has publishing rights. If it is taken,
+STOP and select a different name through a reviewed package change.
+
+For the **first** release only, the owner downloads the exact tarball produced
+by the green dry-run; on their own machine, with npm 2FA:
+
 
 ```sh
-npm publish --access public --tag next
+npm login
+npm publish ./wizard-of-skillz-0.5.0-rc.3.tgz --access public --tag next
+npm view wizard-of-skillz@0.5.0-rc.3 dist.integrity
+
 ```
 
-Do **not** run this command on a private, unverified or unapproved candidate. Afterwards verify the published package version, registry metadata, dist-tag and `npx wizard-of-skillz@next --version` from a clean environment.
+This manual npm bootstrap is an exceptional owner action. It uses the same
+verified archive, not a repackaged local tree. Do not request or store npm
+passwords, OTPs, or write tokens in GitHub Actions.
+
+After the bootstrap, the owner may publish GitHub Release
+`v0.5.0-rc.3`, marked as **Pre-release** and using
+`docs/releases/0.5.0-rc.3.md` as notes. The release
+workflow detects the **identical** npm archive and skips the duplicate publish,
+then verifies the npm registry shasum, integrity and CLI install. If the
+existing archive is DIFFERENT, it fails closed.
+
+Configure the first **npm Trusted Publisher** when the NEXT npm version is
+ready to publish, so validation happens within npm's 2-day activation window.
+Package Settings -> Trusted publishing -> GitHub Actions:
+- Owner: `ainz-dg`
+- Repository: `wizard-of-skillz`
+- Workflow filename: `release.yml`
+- Environment: leave empty (workflow does not declare one)
+- **Allow direct npm publish**: enable explicitly. New publisher registrations
+  grant staging by default, not direct publish.
+
+For the next version, repeat review / dry-run / Git tag / Pre-release publish.
+When the GitHub Release is published, GitHub Actions now publishes to npm via
+OIDC, then verifies archive identity and an isolated install. Prefer
+restricting token-based publishing after successful OIDC validation.
+
+Docs: https://docs.npmjs.com/trusted-publishers/
+
+## Stop conditions and limits
+
+- Different main HEAD, missing/moved tag, draft or stable GitHub Release,
+  unexpected repository, bad package version, failed regression test,
+  suspicious archive content, unavailable npm registry, registry hash conflict:
+  **STOP; no publish**.
+- A successful offline test does not validate provider account login or the
+  business correctness of generated domain skills; note these experimental
+  limitations prominently in the GitHub Release.
+- npm versions are immutable: changes after publication require a NEW version.
+- The workflow does not create the GitHub Release. It requires the owner's
+  explicit published-release action, preserving human governance.
