@@ -21,12 +21,12 @@ export function commandHints(view,{
   if(view==='overview')
     return narrow?[
       '↑↓ Scegli  INVIO Apri  ? Aiuto',
-      '↑↓ Menu  INVIO Scegli  L Modello  Q Esci'
+      'D Dominio  L Modello  K Audit  Q Esci'
     ]:[
       '↑↓ Scegli un’azione  INVIO Seleziona'+
         (hasSemanticReport?'  J Risultati':modelConfigured?'  K Audit':'')+
         (providerPickerEnabled?'  L Provider':''),
-      '? Aiuto  Q Esci  ·  Le modifiche richiedono G → Y'
+      'D Dominio  ? Aiuto  Q Esci  ·  Solo G → Y applica'
     ];
   if(view==='list'){
     if(searching)return [
@@ -99,7 +99,8 @@ export function contextualHelp(view){
   switch(view){
     case 'overview':
       return [
-        'QUI: ↑↓ sceglie il progetto, le risorse documentali, le skill tecniche o il modello.',
+        'QUI: ↑↓ sceglie fra analizzare, esaminare le proposte e cambiare modello.',
+        'Dal menu puoi anche scegliere il progetto e lavorare sulle risorse documentali.',
         'INVIO attiva l’azione evidenziata; K, J e L restano scorciatoie.',
         'Le risorse documentali aprono una guida con fonti, consenso e bozze da approvare.',
         'Non serve ricordare i tasti per utilizzare il Mago.'
