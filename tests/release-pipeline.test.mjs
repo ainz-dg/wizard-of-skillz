@@ -8,7 +8,7 @@ import {validateMetadata,validateArchiveInfo,verifyStoredArtifact}
   from '../scripts/release/guard.mjs';
 
 const SHA='a'.repeat(40);
-const record={name:'wizard-of-skillz',version:'0.5.0-rc.3',
+const record={name:'wizard-of-skillz',version:'0.5.0-rc.3',private:false,
   repository:{url:'git+https://github.com/ainz-dg/wizard-of-skillz.git'},
   publishConfig:{tag:'next'}};
 const common={pkg:record,tag:'v0.5.0-rc.3',
