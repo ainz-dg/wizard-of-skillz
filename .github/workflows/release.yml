@@ -49,6 +49,9 @@ jobs:
           EXPECTED_COMMIT: ${{ inputs.expected_commit }}
         run: node scripts/release/guard.mjs gate
 
+      - name: Validate candidate package metadata
+        run: node scripts/release/guard.mjs package-check
+
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
@@ -62,8 +65,7 @@ jobs:
         id: archive
         run: node scripts/release/guard.mjs pack
 
-      - name: Preserve verified archive for this release
-        if: ${{ github.event_name == 'release' }}
+      - name: Preserve verified archive for release or approved first-publish bootstrap
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.archive.outputs.artifact_name }}
@@ -105,7 +107,8 @@ jobs:
           name: ${{ needs.gate.outputs.artifact_name }}
           path: ${{ runner.temp }}/wizard-verified
 
-      - name: Re-check exact commit, event, archive and unused npm version
+      - name: Re-check exact commit, artifact and npm registry identity
+        id: registry-check
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           ARTIFACT_DIR: ${{ runner.temp }}/wizard-verified
@@ -116,6 +119,7 @@ jobs:
           node scripts/release/guard.mjs prepublish
 
       - name: Publish through npm Trusted Publishing (no stored token)
+        if: ${{ steps.registry-check.outputs.publish_required == 'true' }}
         env:
           TARBALL: ${{ needs.gate.outputs.tarball_name }}
         run: npm publish "${{ runner.temp }}/wizard-verified/$TARBALL" --access public --tag next --provenance
