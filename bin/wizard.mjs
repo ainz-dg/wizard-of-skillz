@@ -92,8 +92,8 @@ Commands:
   stage-update <audit-output-dir> --proposal ID --consumer-root repo --from-file revised-SKILL.md  stage existing revision
   stage-action <audit-output-dir> --proposal ID --consumer-root repo [--from-file new-SKILL.md] [--destination-dir /local/skills]  stage lifecycle
   prepare-update <audit-output-dir> --proposal ID | --proposals ID,ID --consumer-root repo [--llm|--editor [command]]  draft consolidated UPDATE
-  doctor [--llm-provider copilot|ollama|openai-compatible]  verify provider and list models
-  probe [--llm-provider copilot|ollama|openai-compatible]   one minimal LLM round-trip
+  doctor [--llm-provider copilot|ollama|openai-compatible|codex-account|claude-code-account]  verify provider and list models
+  probe [--llm-provider copilot|ollama|openai-compatible|codex-account|claude-code-account]   one minimal LLM round-trip
   profile <repo> [--id org/repo]
   inventory <repo> [--check-references]
   review-references <repo> [--id org/repo] [--none|--all|--select ID,ID] [--format json|md]    read-only skill link repair proposals
@@ -115,12 +115,14 @@ LLM defaults:
   --llm-provider copilot              default; federated auth, no API key
   --llm-provider ollama               Ollama local or explicitly configured server
   --llm-provider openai-compatible    custom OpenAI-compatible endpoint
+  --llm-provider codex-account        locally authenticated OpenAI Codex CLI; no API key
+  --llm-provider claude-code-account  locally authenticated unmodified Claude Code CLI
   --llm-model <name>                  required for Ollama requests; Copilot defaults to auto
   --llm-url <url>                      Ollama defaults to http://127.0.0.1:11434/v1
   --llm-reasoning <effort>            Copilot only: low|medium|high|xhigh|max
 
 Environment:
-  WIZARD_LLM_PROVIDER=copilot|ollama|openai-compatible
+  WIZARD_LLM_PROVIDER=copilot|ollama|openai-compatible|codex-account|claude-code-account
   WIZARD_LLM_MODEL=<name>             select a model for Ollama
   WIZARD_LLM_BASE_URL=<url>           optional Ollama or compatible server URL
   WIZARD_LLM_JSON_MODE=true|false    Ollama defaults to JSON mode
