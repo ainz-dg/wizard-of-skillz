@@ -14,6 +14,7 @@ import {editUpdateDraft,generateUpdateDraft} from './update-drafting.mjs';
 import {performSemanticAudit} from './tui-semantic-audit.mjs';
 import {closeLlmClient} from './llm-provider.mjs';
 import {runDocumentedDomain} from './documented-domain.mjs';
+import {createLocalScan} from './local-scan.mjs';
 import {stageLifecycle,editCreateSkill} from './skill-lifecycle.mjs';
 import {initialProviderSelection,providerDescription,validateProviderSelection,
   LOCAL_OLLAMA_URL} from './tui-provider.mjs';
@@ -205,7 +206,8 @@ const wrapDetail=(lines,width)=>lines.flatMap(line=>{
 export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sourceChecks=null,localScan=null,semanticAudit=null,
   columns=90,rows=28,colors=true,applyConfigured=false,
   editorConfigured=false,modelConfigured=false,
-  providerPickerEnabled=false,providerSelection=null,providerWizard=null,domainWizard=null}={}){
+  providerPickerEnabled=false,providerSelection=null,providerWizard=null,domainWizard=null,
+  projectWizard=null,projectRoot=null,canChooseProject=false,canUseDomain=false}={}){
   // Honor the reported viewport height, including blank padding and footer.
   const items=catalog.items||[],width=Math.max(40,columns);
   const height=Number.isInteger(rows)&&rows>0?rows:28;
@@ -213,7 +215,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
   const visible=visibleProposalIndices(items,state);
   const scope=diagnosticEntries('scope',{scopeHints}),consistency=diagnosticEntries('consistency',{sourceChecks});
   const fmt=(value,name)=>color(name,shorten(value,width-2),colors);
-  const guidedOverview=state.view==='overview'&&!providerWizard&&!domainWizard;
+  const guidedOverview=state.view==='overview'&&!providerWizard&&!domainWizard&&!projectWizard;
   // A 12-row terminal, retain the preview title, progress and safety footer.
   // Omit two decorative/status rows rather than starving diff navigation.
   const tinyDetail=height<=12 && ['detail','preview'].includes(state.view);
@@ -266,6 +268,26 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
     return pinCommandHints(lines,commandHints(state.view,{
       wizardStep:providerWizard.step
     }),{height,width,fmt});
+  }
+  if(projectWizard){
+    const w=projectWizard;
+    const projectLines=[
+      fmt('🪄  WIZARD OF SKILLZ  ·  SCEGLI PROGETTO','cyan'),
+      fmt('─'.repeat(width-2),'gray'),
+      fmt('Indica la directory del repository da esaminare.','bold'),
+      fmt('Puoi scegliere un progetto senza uscire dal Mago.','gray'),
+      '',
+      fmt('Repository attuale: '+(projectRoot??'non selezionato'),'gray'),
+      fmt('Percorso (assoluto o relativo alla cartella corrente):','bold'),
+      fmt('> '+(w.text||'(Invio = repository attuale)'),'cyan'),
+      '',
+      fmt('Scansione strutturale locale; nessuna richiesta AI.','gray')
+    ];
+    if(w.notice)projectLines.push(fmt(w.notice,'yellow'));
+    return pinCommandHints(projectLines,[
+      'Digita percorso  INVIO Apri  BACKSPACE Cancella',
+      'ESC Torna al menu  ·  Q Esci'
+    ],{height,width,fmt});
   }
   if(domainWizard){
     const w=domainWizard;
@@ -328,7 +350,8 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
   if(state.view==='overview'){
     const options=overviewActions({
       hasSemanticReport:Boolean(semanticAudit),modelConfigured,providerPickerEnabled,
-      proposalCount:items.length,modelLabel:providerDescription(providerSelection)
+      proposalCount:items.length,modelLabel:providerDescription(providerSelection),
+      canChooseProject,canUseDomain,projectLabel:projectRoot??'non selezionato'
     });
     const active=activeOverviewChoice(options,state.overviewChoice);
     const compact=height<20;
@@ -347,7 +370,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
       }),{height,width,fmt});
     }
     lines.push(
-      fmt('Repository: '+(catalog.source_repositories?.consumer??'locale'),'gray'),
+      fmt('Repository: '+(projectRoot??catalog.source_repositories?.consumer??'locale'),'gray'),
       fmt((localScan?localScan.skill_count+' skill individuate':'Proposte strutturali: '+items.length)+
         '  ·  Proposte: '+items.length,'bold')
     );
@@ -618,6 +641,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
   let providerSelection=initialProviderSelection(initialProvider??{});
   let providerWizard=null;
   let domainWizard=null;
+  let projectWizard=null;
   try{
     const stored=readReviewSession(folder);
     if(stored){
@@ -636,7 +660,8 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     editorConfigured:Boolean(consumerRoot),
     modelConfigured:Boolean(consumerRoot && (clientFactory||providerFactory)),
     providerPickerEnabled:typeof providerFactory==='function',
-    providerSelection,providerWizard,domainWizard
+    providerSelection,providerWizard,domainWizard,projectWizard,
+    projectRoot:consumerRoot,canChooseProject:true,canUseDomain:Boolean(consumerRoot)
   }));
   let busy=false;
   const draftIds=()=>{
