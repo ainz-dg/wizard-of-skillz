@@ -56,12 +56,13 @@ test('inspect the real set of shipped files, not just source package metadata',(
 test('exact release bytes must match previous immutable sha256 job output',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'wizard-artifact-test-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  const file='wizard-of-skillz-0.5.0-rc.3.tgz';
+  const version=JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.url),'utf8')).version;
+  const file='wizard-of-skillz-'+version+'.tgz';
   const content=Buffer.from('safe test fixture, not a real tarball');
   fs.writeFileSync(path.join(dir,file),content);
   const hash=crypto.createHash('sha256').update(content).digest('hex');
   fs.writeFileSync(path.join(dir,'release-archive.json'),JSON.stringify({
-    package:'wizard-of-skillz',version:'0.5.0-rc.3',
+    package:'wizard-of-skillz',version,
     tarball:file,sha256:hash}));
   assert.equal(verifyStoredArtifact(dir,hash).sha256,hash);
   assert.throws(()=>verifyStoredArtifact(dir,'0'.repeat(64)),/upstream gate/);
