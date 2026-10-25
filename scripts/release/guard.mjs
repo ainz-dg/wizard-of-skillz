@@ -167,7 +167,14 @@ async function registryVerify(){
 const cmd=process.argv[2];
 if(cmd){
   try{
-    if(cmd==='gate')ensureEvent();
+    if(cmd==='package-check'){
+      const pkg=currentPackage();
+      assert.equal(pkg.name,PACKAGE_NAME);
+      assert.match(pkg.version,RELEASE_VERSION);
+      assert.equal(pkg.publishConfig?.tag,NPM_TAG);
+      console.log('Package metadata verified:',pkg.name,pkg.version);
+    }
+    else if(cmd==='gate')ensureEvent();
     else if(cmd==='pack')pack();
     else if(cmd==='verify-artifact'){
       const record=verifyStoredArtifact(process.env.ARTIFACT_DIR,process.env.EXPECTED_SHA256);
