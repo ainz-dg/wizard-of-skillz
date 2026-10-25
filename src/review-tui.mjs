@@ -13,6 +13,7 @@ import {loadReviewPreviews} from './review-candidates.mjs';
 import {editUpdateDraft,generateUpdateDraft} from './update-drafting.mjs';
 import {performSemanticAudit} from './tui-semantic-audit.mjs';
 import {closeLlmClient} from './llm-provider.mjs';
+import {runDocumentedDomain} from './documented-domain.mjs';
 import {stageLifecycle,editCreateSkill} from './skill-lifecycle.mjs';
 import {initialProviderSelection,providerDescription,validateProviderSelection,
   LOCAL_OLLAMA_URL} from './tui-provider.mjs';
@@ -204,7 +205,7 @@ const wrapDetail=(lines,width)=>lines.flatMap(line=>{
 export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sourceChecks=null,localScan=null,semanticAudit=null,
   columns=90,rows=28,colors=true,applyConfigured=false,
   editorConfigured=false,modelConfigured=false,
-  providerPickerEnabled=false,providerSelection=null,providerWizard=null}={}){
+  providerPickerEnabled=false,providerSelection=null,providerWizard=null,domainWizard=null}={}){
   // Honor the reported viewport height, including blank padding and footer.
   const items=catalog.items||[],width=Math.max(40,columns);
   const height=Number.isInteger(rows)&&rows>0?rows:28;
@@ -212,7 +213,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
   const visible=visibleProposalIndices(items,state);
   const scope=diagnosticEntries('scope',{scopeHints}),consistency=diagnosticEntries('consistency',{sourceChecks});
   const fmt=(value,name)=>color(name,shorten(value,width-2),colors);
-  const guidedOverview=state.view==='overview'&&!providerWizard;
+  const guidedOverview=state.view==='overview'&&!providerWizard&&!domainWizard;
   // A 12-row terminal, retain the preview title, progress and safety footer.
   // Omit two decorative/status rows rather than starving diff navigation.
   const tinyDetail=height<=12 && ['detail','preview'].includes(state.view);
@@ -265,6 +266,64 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
     return pinCommandHints(lines,commandHints(state.view,{
       wizardStep:providerWizard.step
     }),{height,width,fmt});
+  }
+  if(domainWizard){
+    const w=domainWizard;
+    const domainLines=[
+      fmt('🪄  WIZARD OF SKILLZ  ·  DOCUMENTED DOMAIN','cyan'),
+      fmt('─'.repeat(width-2),'gray'),
+      fmt('Solo bozze: nessuna modifica alle skill o ai documenti.','gray')
+    ];
+    if(w.notice)domainLines.push(fmt(w.notice,'yellow'));
+    if(w.step==='resources'){
+      domainLines.push('',fmt('1/2  Dove sono le resources del dominio?','bold'),
+        fmt('Percorso relativo al repository o assoluto:','gray'),
+        fmt('> '+(w.text||'(Invio = resources)'),'cyan'));
+    }else if(w.step==='skills'){
+      domainLines.push('',fmt('2/2  Dove si trovano le skills esistenti?','bold'),
+        fmt('La directory può non esistere ancora.','gray'),
+        fmt('> '+w.text,'cyan'));
+    }else if(w.step==='review'||w.step==='confirm'){
+      domainLines.push('',fmt('Resources: '+w.resources,'bold'),
+        fmt('Skills: '+w.skills,'bold'),
+        fmt('Documenti individuati: '+(w.inventory?.resources_count??0),'cyan'),
+        fmt('Skill esistenti: '+(w.inventory?.existing_skill_count??0),'cyan'),
+        fmt('Provider: '+providerDescription(providerSelection),'gray'),
+        fmt('I file supportati sono md, txt, yaml, yml, json.','gray'),
+        '');
+      if(w.step==='confirm')
+        domainLines.push(fmt('ATTENZIONE: il modello riceverà contenuti delle resources','yellow'),
+          fmt('e frammenti delle skill esistenti.','yellow'),
+          fmt('Y Conferma invio e genera bozze · ESC Annulla','bold'));
+      else domainLines.push(fmt('M Proponi bozze con il modello · L Cambia provider','bold'),
+        fmt('Nessuna chiamata al modello è stata eseguita.','gray'));
+    }else if(w.step==='result'){
+      const drafts=w.result?.draft_skills??[];
+      domainLines.push('',fmt('Bozze proposte: '+drafts.length,'bold'),
+        fmt('Documentazione analizzata: '+(w.result?.resources_count??0)+' documenti','gray'),
+        fmt('Report: '+(w.result?.output_directory??''),'gray'),
+        fmt('↑↓ Scegli · INVIO Leggi la bozza · ESC Torna','cyan'));
+      drafts.forEach((draft,i)=>domainLines.push(fmt(
+        (i===(w.cursor??0)?' ❯ ':'   ')+draft.name,
+        i===(w.cursor??0)?'cyan':'bold')));
+      if(!drafts.length)domainLines.push(fmt('Nessuna skill proposta: verificare le fonti o il report.','yellow'));
+    }else if(w.step==='draft'){
+      const drafts=w.result?.draft_skills??[];
+      const current=drafts[w.cursor??0];
+      const body=wrapTuiLines(String(w.draftText??'').split(/\r?\n/),Math.max(20,width-4));
+      const visible=Math.max(1,height-domainLines.length-5);
+      const pos=Math.min(w.scroll??0,Math.max(0,body.length-visible));
+      domainLines.push('',fmt('BOZZA: '+(current?.name??'?'),'bold'),
+        fmt('Righe '+(body.length?pos+1:0)+'-'+Math.min(body.length,pos+visible)+'/'+body.length,'gray'));
+      for(const row of body.slice(pos,pos+visible))domainLines.push(fmt(row,'bold'));
+    }
+    const hints=w.step==='resources'||w.step==='skills'?
+      ['Digita percorso  INVIO Conferma  BACKSPACE Cancella','ESC Indietro · Q Esci']:
+      w.step==='review'?['M Genera bozze  L Provider  ESC Percorsi','Nessuna scrittura nelle skill · Q Esci']:
+      w.step==='confirm'?['Y Invia le fonti al modello  ESC Annulla','Non inviare dati riservati a provider non autorizzati']:
+      w.step==='result'?['↑↓ Scegli  INVIO Leggi bozza  ESC Menu','Bozze da approvare, non installate']:
+      ['↑↓ Scorri la bozza · ESC Torna ai risultati','Nessuna Apply automatica · Q Esci'];
+    return pinCommandHints(domainLines,hints,{height,width,fmt});
   }
   if(state.view==='overview'){
     const options=overviewActions({
@@ -558,6 +617,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
   let state=initialTuiState({guided:true});
   let providerSelection=initialProviderSelection(initialProvider??{});
   let providerWizard=null;
+  let domainWizard=null;
   try{
     const stored=readReviewSession(folder);
     if(stored){
@@ -576,7 +636,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     editorConfigured:Boolean(consumerRoot),
     modelConfigured:Boolean(consumerRoot && (clientFactory||providerFactory)),
     providerPickerEnabled:typeof providerFactory==='function',
-    providerSelection,providerWizard
+    providerSelection,providerWizard,domainWizard
   }));
   let busy=false;
   const draftIds=()=>{
@@ -727,6 +787,89 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       busy=false;draw();
     }
   };
+  const inspectDomain=async()=>{
+    const current={...domainWizard};
+    busy=true;current.notice='Scansione locale delle resources: nessun modello chiamato.';
+    domainWizard=current;draw();
+    try{
+      const inventory=await runDocumentedDomain({
+        root:consumerRoot,resources:current.resources,skills:current.skills
+      });
+      domainWizard={...current,step:'review',inventory,
+        notice:'Fonti individuate. Premi M per valutare una proposta con l’AI.'};
+    }catch(error){domainWizard={...current,step:'skills',text:current.skills,
+      notice:'Resources: '+error.message};}
+    finally{busy=false;draw();}
+  };
+  const generateDomain=async()=>{
+    const current={...domainWizard};
+    busy=true;domainWizard={...current,notice:'Richiesta esplicita al modello in corso...'};
+    draw();let client=null;
+    try{
+      client=typeof providerFactory==='function'?
+        providerFactory({...providerSelection}):clientFactory();
+      const result=await runDocumentedDomain({
+        root:consumerRoot,resources:current.resources,skills:current.skills,client
+      });
+      domainWizard={...current,step:'result',result,cursor:0,scroll:0,
+        notice:'Bozze create fuori dal progetto. Nessuna Apply.'};
+    }catch(error){domainWizard={...current,step:'review',
+      notice:'Generazione non riuscita: '+error.message};}
+    finally{
+      try{await closeLlmClient(client);}catch{}
+      busy=false;draw();
+    }
+  };
+  const domainKey=(ch,command)=>{
+    const w=domainWizard;
+    if(command==='q'){finish();return;}
+    if(command==='escape'){
+      if(w.step==='resources'||w.step==='result'){domainWizard=null;}
+      else if(w.step==='skills')domainWizard={...w,step:'resources',text:w.resources};
+      else if(w.step==='review')domainWizard={...w,step:'skills',text:w.skills};
+      else if(w.step==='confirm')domainWizard={...w,step:'review'};
+      else if(w.step==='draft')domainWizard={...w,step:'result',scroll:0};
+      return;
+    }
+    if(command==='l'&&w.step==='review'){
+      beginProvider();return;
+    }
+    if(w.step==='resources'||w.step==='skills'){
+      if(command==='backspace')domainWizard={...w,text:w.text.slice(0,-1),notice:''};
+      else if(command==='enter'){
+        const choice=w.text.trim()||(w.step==='resources'?'resources':'skills');
+        if(w.step==='resources'){
+          domainWizard={...w,resources:choice,step:'skills',text:'',notice:''};
+        }else{
+          domainWizard={...w,skills:choice,notice:''};
+          void inspectDomain();
+        }
+      }else if(typeof ch==='string'&&ch.length===1&&!/[\x00-\x1f\x7f]/.test(ch)
+        &&w.text.length<1024){
+        domainWizard={...w,text:w.text+ch,notice:''};
+      }
+    }else if(w.step==='review'&&command==='m'){
+      if(typeof providerFactory!=='function'&&typeof clientFactory!=='function'){
+        domainWizard={...w,notice:'Provider non disponibile. Configura prima L.'};return;
+      }
+      try{validateProviderSelection(providerSelection);}
+      catch(error){domainWizard={...w,notice:'Provider: '+error.message+' (L per scegliere)'};return;}
+      domainWizard={...w,step:'confirm',notice:''};
+    }else if(w.step==='confirm'&&command==='y'){
+      void generateDomain();return;
+    }else if(w.step==='result'){
+      const drafts=w.result?.draft_skills??[];
+      if(command==='up'||command==='down')domainWizard={...w,
+        cursor:Math.max(0,Math.min(drafts.length-1,(w.cursor??0)+(command==='up'?-1:1)))};
+      else if(command==='enter'&&drafts.length){
+        const file=path.join(w.result.output_directory,drafts[w.cursor??0].path);
+        try{domainWizard={...w,step:'draft',scroll:0,draftText:fs.readFileSync(file,'utf8')};}
+        catch(error){domainWizard={...w,notice:'Bozza non leggibile: '+error.message};}
+      }
+    }else if(w.step==='draft'&&(command==='up'||command==='down')){
+      domainWizard={...w,scroll:Math.max(0,(w.scroll??0)+(command==='up'?-1:1))};
+    }
+  };
   const beginProvider=()=>{
     if(typeof providerFactory!=='function')return;
     providerWizard={step:'menu',returnView:state.view,text:'',draft:null};
@@ -871,6 +1014,14 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     if(key.ctrl&&command==='c'){finish();return;}
     if(providerWizard){
       try{providerKey(ch,command);}catch(error){state.notice='LLM: '+error.message;}
+      draw();return;
+    }
+    if(domainWizard){
+      domainKey(ch,command);draw();return;
+    }
+    if(command==='d'&&!state.searching&&state.view==='overview'&&consumerRoot){
+      domainWizard={step:'resources',resources:'resources',skills:'skills',text:'',
+        inventory:null,result:null,notice:'',cursor:0,scroll:0};
       draw();return;
     }
     if(state.view==='help'){

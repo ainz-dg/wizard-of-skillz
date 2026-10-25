@@ -21,6 +21,36 @@ node bin/wizard.mjs scan /path/to/disposable-project
 
 With no arguments, `wizard` scans the current directory locally and starts the TUI on an interactive terminal. For first runs use a **disposable project**, not sensitive or production source.
 
+## Resources-first documented domains (experimental)
+
+You can create review-only candidate Agent Skills from an explicitly selected documentation
+folder, even when no skills exist yet. For an interactive setup:
+
+
+```sh
+node bin/wizard.mjs scan /path/to/disposable-domain-repo
+```
+
+Press **D** on the TUI overview, choose the resource and existing-skill folders
+(defaults are `resources` and `skills`), inspect the offline source
+inventory, select the LLM with **L**, then press **M** to request a draft and **Y**
+to authorize sending excerpts to that model. Enter opens the generated
+`SKILL.md` drafts for inspection. Drafts remain outside the inspected repo.
+
+Alternatively, from the command line:
+
+
+```sh
+node bin/wizard.mjs domain /path/to/disposable-domain-repo \
+  --resources resources --skills skills --llm --llm-provider codex-account
+```
+
+Domain resources currently support MD, TXT, YAML and JSON only — not PDF or DOCX.
+`--llm` is explicit and may disclose selected local documents to the
+configured provider. No generated skill is automatically installed or approved.
+See [domain guide](docs/DOCUMENTED-DOMAIN.md) and
+[account-backed providers](docs/ACCOUNT-PROVIDERS.md).
+
 After an approved npm prerelease is published with the `next` dist-tag, users will be able to run:
 
 ```sh

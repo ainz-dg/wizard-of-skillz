@@ -12,6 +12,22 @@ A domain repository may contain:
 Wizard has no special meaning for any organization's folder conventions. Select a
 resource directory explicitly.
 
+## Guided TUI (recommended)
+
+From the Wizard checkout, run:
+
+
+```sh
+node bin/wizard.mjs scan /path/to/disposable-domain-repository
+```
+
+In the TUI overview press **D**. Enter the path to the declared resources
+directory (default `resources`), then the existing skills directory (default
+`skills`, which may not exist). Wizard shows a **read-only local inventory** first.
+Press **L** to choose the LLM provider, **M** to request generation and **Y**
+to authorize disclosure to the selected provider. Choose draft skills with the
+arrow keys and **Enter** to read their full text; no installation or Apply occurs.
+
 ## Read-only inventory
 
     node bin/wizard.mjs domain ./example --resources resources --out /tmp/wizard-domain-audit
