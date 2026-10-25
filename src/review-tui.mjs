@@ -812,6 +812,52 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       busy=false;draw();
     }
   };
+  const openProject=()=>{
+    projectWizard={text:'',notice:''};
+    state.notice='';
+  };
+  const chooseProject=()=>{
+    const inputPath=projectWizard.text.trim();
+    try{
+      const requested=path.resolve(inputPath||consumerRoot||process.cwd());
+      const root=fs.realpathSync(requested);
+      if(!fs.statSync(root).isDirectory())throw Error('La selezione deve essere una directory.');
+      // A fresh scan writes only to an external temporary review directory.
+      const scan=createLocalScan(root);
+      const nextFolder=scan.output_directory;
+      const nextProposals=JSON.parse(fs.readFileSync(path.join(nextFolder,'repair-proposals.json'),'utf8'));
+      const nextPreviews=loadReviewPreviews(nextFolder,nextProposals,null);
+      const nextCatalog=buildReviewCatalog(nextProposals,{previews:nextPreviews});
+      folder=nextFolder;
+      consumerRoot=root;
+      providerRoot=null;
+      moveDestinationDir=null;
+      proposals=nextProposals;previews=nextPreviews;catalog=nextCatalog;
+      Object.assign(extra,{
+        previews:nextPreviews,scopeHints:null,sourceChecks:null,
+        localScan:scan,semanticAudit:null
+      });
+      state={...initialTuiState({guided:true}),notice:
+        'Progetto selezionato. '+scan.skill_count+' skill trovate; nessuna richiesta AI.'};
+      projectWizard=null;domainWizard=null;
+    }catch(error){
+      projectWizard={...projectWizard,notice:'Impossibile aprire il progetto: '+error.message};
+    }
+  };
+  const projectKey=(ch,command)=>{
+    if(command==='escape'){projectWizard=null;return;}
+    if(command==='q'){finish();return;}
+    if(command==='backspace')projectWizard={...projectWizard,text:projectWizard.text.slice(0,-1),notice:''};
+    else if(command==='enter')chooseProject();
+    else if(typeof ch==='string'&&ch.length===1&&!/[\x00-\x1f\x7f]/.test(ch)
+      &&projectWizard.text.length<1024)
+      projectWizard={...projectWizard,text:projectWizard.text+ch,notice:''};
+  };
+  const beginDomain=()=>{
+    if(!consumerRoot){state.notice='Prima scegli un repository.';return;}
+    domainWizard={step:'resources',resources:'resources',skills:'skills',text:'',
+      inventory:null,result:null,notice:'',cursor:0,scroll:0};
+  };
   const inspectDomain=async()=>{
     const current={...domainWizard};
     busy=true;current.notice='Scansione locale delle resources: nessun modello chiamato.';
@@ -1041,12 +1087,14 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       try{providerKey(ch,command);}catch(error){state.notice='LLM: '+error.message;}
       draw();return;
     }
+    if(projectWizard){
+      projectKey(ch,command);draw();return;
+    }
     if(domainWizard){
       domainKey(ch,command);draw();return;
     }
     if(command==='d'&&!state.searching&&state.view==='overview'&&consumerRoot){
-      domainWizard={step:'resources',resources:'resources',skills:'skills',text:'',
-        inventory:null,result:null,notice:'',cursor:0,scroll:0};
+      beginDomain();
       draw();return;
     }
     if(state.view==='help'){
@@ -1071,7 +1119,9 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         hasSemanticReport:Boolean(extra.semanticAudit),
         modelConfigured:Boolean(consumerRoot&&(clientFactory||providerFactory)),
         providerPickerEnabled:typeof providerFactory==='function',
-        proposalCount:catalog.items.length,modelLabel:providerDescription(providerSelection)
+        proposalCount:catalog.items.length,modelLabel:providerDescription(providerSelection),
+        canChooseProject:true,canUseDomain:Boolean(consumerRoot),
+        projectLabel:consumerRoot??'non selezionato'
       });
       if(command==='up'||command==='down'){
         state.overviewChoice=moveOverviewChoice(options,state.overviewChoice,
@@ -1079,6 +1129,8 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         draw();return;
       }
       const chosen=activeOverviewChoice(options,state.overviewChoice);
+      if(chosen?.id==='project'){openProject();draw();return;}
+      if(chosen?.id==='domain'){beginDomain();draw();return;}
       if(chosen?.id==='audit'){void semanticMessage();return;}
       if(chosen?.id==='results'){
         state={...state,view:'semantic-list',semanticCursor:0,scroll:0};
