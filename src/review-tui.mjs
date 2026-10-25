@@ -14,6 +14,7 @@ import {editUpdateDraft,generateUpdateDraft} from './update-drafting.mjs';
 import {performSemanticAudit} from './tui-semantic-audit.mjs';
 import {closeLlmClient} from './llm-provider.mjs';
 import {runDocumentedDomain} from './documented-domain.mjs';
+import {createLocalScan} from './local-scan.mjs';
 import {stageLifecycle,editCreateSkill} from './skill-lifecycle.mjs';
 import {initialProviderSelection,providerDescription,validateProviderSelection,
   LOCAL_OLLAMA_URL} from './tui-provider.mjs';
@@ -205,7 +206,8 @@ const wrapDetail=(lines,width)=>lines.flatMap(line=>{
 export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sourceChecks=null,localScan=null,semanticAudit=null,
   columns=90,rows=28,colors=true,applyConfigured=false,
   editorConfigured=false,modelConfigured=false,
-  providerPickerEnabled=false,providerSelection=null,providerWizard=null,domainWizard=null}={}){
+  providerPickerEnabled=false,providerSelection=null,providerWizard=null,domainWizard=null,
+  projectWizard=null,projectRoot=null,canChooseProject=false,canUseDomain=false}={}){
   // Honor the reported viewport height, including blank padding and footer.
   const items=catalog.items||[],width=Math.max(40,columns);
   const height=Number.isInteger(rows)&&rows>0?rows:28;
@@ -213,7 +215,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
   const visible=visibleProposalIndices(items,state);
   const scope=diagnosticEntries('scope',{scopeHints}),consistency=diagnosticEntries('consistency',{sourceChecks});
   const fmt=(value,name)=>color(name,shorten(value,width-2),colors);
-  const guidedOverview=state.view==='overview'&&!providerWizard&&!domainWizard;
+  const guidedOverview=state.view==='overview'&&!providerWizard&&!domainWizard&&!projectWizard;
   // A 12-row terminal, retain the preview title, progress and safety footer.
   // Omit two decorative/status rows rather than starving diff navigation.
   const tinyDetail=height<=12 && ['detail','preview'].includes(state.view);
@@ -267,6 +269,26 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
       wizardStep:providerWizard.step
     }),{height,width,fmt});
   }
+  if(projectWizard){
+    const w=projectWizard;
+    const projectLines=[
+      fmt('🪄  WIZARD OF SKILLZ  ·  SCEGLI PROGETTO','cyan'),
+      fmt('─'.repeat(width-2),'gray'),
+      fmt('Indica la directory del repository da esaminare.','bold'),
+      fmt('Puoi scegliere un progetto senza uscire dal Mago.','gray'),
+      '',
+      fmt('Repository attuale: '+(projectRoot?path.basename(projectRoot)+' · '+projectRoot:'non selezionato'),'gray'),
+      fmt('Percorso (assoluto o relativo alla cartella corrente):','bold'),
+      fmt('> '+(w.text||'(Invio = repository attuale)'),'cyan'),
+      '',
+      fmt('Scansione strutturale locale; nessuna richiesta AI.','gray')
+    ];
+    if(w.notice)projectLines.push(fmt(w.notice,'yellow'));
+    return pinCommandHints(projectLines,[
+      'Digita percorso  INVIO Apri  BACKSPACE Cancella',
+      'ESC Torna al menu  ·  Ctrl+C Esci'
+    ],{height,width,fmt});
+  }
   if(domainWizard){
     const w=domainWizard;
     const domainLines=[
@@ -318,7 +340,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
       for(const row of body.slice(pos,pos+visible))domainLines.push(fmt(row,'bold'));
     }
     const hints=w.step==='resources'||w.step==='skills'?
-      ['Digita percorso  INVIO Conferma  BACKSPACE Cancella','ESC Indietro · Q Esci']:
+      ['Digita percorso  INVIO Conferma  BACKSPACE Cancella','ESC Indietro · Ctrl+C Esci']:
       w.step==='review'?['M Genera bozze  L Provider  ESC Percorsi','Nessuna scrittura nelle skill · Q Esci']:
       w.step==='confirm'?['Y Invia le fonti al modello  ESC Annulla','Non inviare dati riservati a provider non autorizzati']:
       w.step==='result'?['↑↓ Scegli  INVIO Leggi bozza  ESC Menu','Bozze da approvare, non installate']:
@@ -328,7 +350,8 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
   if(state.view==='overview'){
     const options=overviewActions({
       hasSemanticReport:Boolean(semanticAudit),modelConfigured,providerPickerEnabled,
-      proposalCount:items.length,modelLabel:providerDescription(providerSelection)
+      proposalCount:items.length,modelLabel:providerDescription(providerSelection),
+      canChooseProject,canUseDomain,projectLabel:projectRoot??'non selezionato'
     });
     const active=activeOverviewChoice(options,state.overviewChoice);
     const compact=height<20;
@@ -347,7 +370,8 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
       }),{height,width,fmt});
     }
     lines.push(
-      fmt('Repository: '+(catalog.source_repositories?.consumer??'locale'),'gray'),
+      fmt('Repository: '+(projectRoot?path.basename(projectRoot)+' · '+projectRoot:
+        catalog.source_repositories?.consumer??'locale'),'gray'),
       fmt((localScan?localScan.skill_count+' skill individuate':'Proposte strutturali: '+items.length)+
         '  ·  Proposte: '+items.length,'bold')
     );
@@ -618,6 +642,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
   let providerSelection=initialProviderSelection(initialProvider??{});
   let providerWizard=null;
   let domainWizard=null;
+  let projectWizard=null;
   try{
     const stored=readReviewSession(folder);
     if(stored){
@@ -636,7 +661,8 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     editorConfigured:Boolean(consumerRoot),
     modelConfigured:Boolean(consumerRoot && (clientFactory||providerFactory)),
     providerPickerEnabled:typeof providerFactory==='function',
-    providerSelection,providerWizard,domainWizard
+    providerSelection,providerWizard,domainWizard,projectWizard,
+    projectRoot:consumerRoot,canChooseProject:true,canUseDomain:Boolean(consumerRoot)
   }));
   let busy=false;
   const draftIds=()=>{
@@ -787,6 +813,52 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       busy=false;draw();
     }
   };
+  const openProject=()=>{
+    projectWizard={text:'',notice:''};
+    state.notice='';
+  };
+  const chooseProject=()=>{
+    const inputPath=projectWizard.text.trim();
+    try{
+      const requested=path.resolve(inputPath||consumerRoot||process.cwd());
+      const root=fs.realpathSync(requested);
+      if(!fs.statSync(root).isDirectory())throw Error('La selezione deve essere una directory.');
+      // A fresh scan writes only to an external temporary review directory.
+      const scan=createLocalScan(root);
+      const nextFolder=scan.output_directory;
+      const nextProposals=JSON.parse(fs.readFileSync(path.join(nextFolder,'repair-proposals.json'),'utf8'));
+      const nextPreviews=loadReviewPreviews(nextFolder,nextProposals,null);
+      const nextCatalog=buildReviewCatalog(nextProposals,{previews:nextPreviews});
+      folder=nextFolder;
+      consumerRoot=root;
+      providerRoot=null;
+      moveDestinationDir=null;
+      proposals=nextProposals;previews=nextPreviews;catalog=nextCatalog;
+      Object.assign(extra,{
+        previews:nextPreviews,scopeHints:null,sourceChecks:null,
+        localScan:scan,semanticAudit:null
+      });
+      state={...initialTuiState({guided:true}),notice:
+        'Progetto selezionato. '+scan.skill_count+' skill trovate; nessuna richiesta AI.'};
+      projectWizard=null;domainWizard=null;
+    }catch(error){
+      projectWizard={...projectWizard,notice:'Impossibile aprire il progetto: '+error.message};
+    }
+  };
+  const projectKey=(ch,command)=>{
+    if(command==='escape'){projectWizard=null;return;}
+    // While typing a path, q is part of the text, not the Quit shortcut.
+    if(command==='backspace')projectWizard={...projectWizard,text:projectWizard.text.slice(0,-1),notice:''};
+    else if(command==='enter')chooseProject();
+    else if(typeof ch==='string'&&ch.length===1&&!/[\x00-\x1f\x7f]/.test(ch)
+      &&projectWizard.text.length<1024)
+      projectWizard={...projectWizard,text:projectWizard.text+ch,notice:''};
+  };
+  const beginDomain=()=>{
+    if(!consumerRoot){state.notice='Prima scegli un repository.';return;}
+    domainWizard={step:'resources',resources:'resources',skills:'skills',text:'',
+      inventory:null,result:null,notice:'',cursor:0,scroll:0};
+  };
   const inspectDomain=async()=>{
     const current={...domainWizard};
     busy=true;current.notice='Scansione locale delle resources: nessun modello chiamato.';
@@ -822,7 +894,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
   };
   const domainKey=(ch,command)=>{
     const w=domainWizard;
-    if(command==='q'){finish();return;}
+    if(command==='q'&&!['resources','skills'].includes(w.step)){finish();return;}
     if(command==='escape'){
       if(w.step==='resources'||w.step==='result'){domainWizard=null;}
       else if(w.step==='skills')domainWizard={...w,step:'resources',text:w.resources};
@@ -1016,12 +1088,14 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       try{providerKey(ch,command);}catch(error){state.notice='LLM: '+error.message;}
       draw();return;
     }
+    if(projectWizard){
+      projectKey(ch,command);draw();return;
+    }
     if(domainWizard){
       domainKey(ch,command);draw();return;
     }
     if(command==='d'&&!state.searching&&state.view==='overview'&&consumerRoot){
-      domainWizard={step:'resources',resources:'resources',skills:'skills',text:'',
-        inventory:null,result:null,notice:'',cursor:0,scroll:0};
+      beginDomain();
       draw();return;
     }
     if(state.view==='help'){
@@ -1046,7 +1120,9 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         hasSemanticReport:Boolean(extra.semanticAudit),
         modelConfigured:Boolean(consumerRoot&&(clientFactory||providerFactory)),
         providerPickerEnabled:typeof providerFactory==='function',
-        proposalCount:catalog.items.length,modelLabel:providerDescription(providerSelection)
+        proposalCount:catalog.items.length,modelLabel:providerDescription(providerSelection),
+        canChooseProject:true,canUseDomain:Boolean(consumerRoot),
+        projectLabel:consumerRoot??'non selezionato'
       });
       if(command==='up'||command==='down'){
         state.overviewChoice=moveOverviewChoice(options,state.overviewChoice,
@@ -1054,6 +1130,8 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         draw();return;
       }
       const chosen=activeOverviewChoice(options,state.overviewChoice);
+      if(chosen?.id==='project'){openProject();draw();return;}
+      if(chosen?.id==='domain'){beginDomain();draw();return;}
       if(chosen?.id==='audit'){void semanticMessage();return;}
       if(chosen?.id==='results'){
         state={...state,view:'semantic-list',semanticCursor:0,scroll:0};

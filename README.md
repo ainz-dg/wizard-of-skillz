@@ -6,6 +6,15 @@ A generic, terminal-first, human-controlled assistant for reviewing and maintain
 
 **Status: pre-release source candidate 0.5.0-rc.2.** This repository contains a clean-history snapshot; validation and publication review are in progress. No official GitHub Release or npm package has been published.
 
+## Use Wizard: TUI first
+
+The interactive terminal interface is the recommended way to use Wizard.
+The CLI remains for automation, scripting and advanced repeatable operations.
+When started in an interactive terminal without arguments, Wizard opens its TUI
+and offers guided paths to choose another repository, analyze existing skills,
+review documented-domain sources, examine proposals and select an AI provider.
+Choosing resources never requires a separate CLI command.
+
 ## Try locally (before release)
 
 Requires Node.js 22.12 or later. In a clean checkout:
@@ -31,7 +40,8 @@ folder, even when no skills exist yet. For an interactive setup:
 node bin/wizard.mjs scan /path/to/disposable-domain-repo
 ```
 
-Press **D** on the TUI overview, choose the resource and existing-skill folders
+Choose **Crea e verifica skill dalle risorse documentali** on the TUI overview
+(or use the D shortcut), choose the resource and existing-skill folders
 (defaults are `resources` and `skills`), inspect the offline source
 inventory, select the LLM with **L**, then press **M** to request a draft and **Y**
 to authorize sending excerpts to that model. Enter opens the generated

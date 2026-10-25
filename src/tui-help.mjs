@@ -26,7 +26,7 @@ export function commandHints(view,{
       '↑↓ Scegli un’azione  INVIO Seleziona'+
         (hasSemanticReport?'  J Risultati':modelConfigured?'  K Audit':'')+
         (providerPickerEnabled?'  L Provider':''),
-      'D Dominio  ? Aiuto  Q Esci  ·  Solo G → Y può applicare le modifiche'
+      'D Dominio  ? Aiuto  Q Esci  ·  Solo G → Y applica'
     ];
   if(view==='list'){
     if(searching)return [
@@ -81,7 +81,7 @@ export const HELP_LINES=[
   'COME FUNZIONA',
   '1. SCANSIONE: il comando wizard scan controlla struttura e link senza modelli.',
   '2. ANALISI: L sceglie il provider AI; K invia le claim e gli snippet al modello.',
-  '   D dal menu: scegli resources e skills, M prepara una richiesta, Y autorizza invio AI.',
+  '   Dal menu: scegli il progetto e le risorse, M prepara una richiesta, Y autorizza invio AI.',
   '3. VERIFICA: J apre gli esiti; una citazione valida non dimostra un errore.',
   '4. PROPOSTA DI MODIFICA: M chiede all’AI un SKILL.md completo rivisto (solo UPDATE).',
   '   E permette una modifica con editor; P mostra il diff. Nessuna scrittura nel progetto.',
@@ -100,8 +100,9 @@ export function contextualHelp(view){
     case 'overview':
       return [
         'QUI: ↑↓ sceglie fra analizzare, esaminare le proposte e cambiare modello.',
+        'Dal menu puoi anche scegliere il progetto e lavorare sulle risorse documentali.',
         'INVIO attiva l’azione evidenziata; K, J e L restano scorciatoie.',
-        'D apre il percorso documentale: resources, modello e bozze da approvare.',
+        'Le risorse documentali aprono una guida con fonti, consenso e bozze da approvare.',
         'Non serve ricordare i tasti per utilizzare il Mago.'
       ];
     case 'list':
