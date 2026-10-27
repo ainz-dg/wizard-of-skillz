@@ -37,6 +37,7 @@ export function createLlmClient(overrides = {}) {
       jsonMode: overrides.jsonMode ??
         (process.env.WIZARD_LLM_JSON_MODE===undefined?true:
           boolEnv(process.env.WIZARD_LLM_JSON_MODE)),
+      reasoningEffort: overrides.reasoningEffort ?? null,
       apiKey: overrides.apiKey ?? process.env.WIZARD_OLLAMA_API_KEY ?? null,
       fetchImpl: overrides.fetchImpl
     });

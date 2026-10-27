@@ -43,6 +43,7 @@ test('Ollama provider reuses OpenAI-compatible JSON transport without Copilot SD
     assert.equal(requests[0].auth,null);
     assert.equal(requests[0].body.model,'qwen3:8b');
     assert.equal(requests[0].body.response_format.type,'json_object');
+    assert.equal(Object.hasOwn(requests[0].body,'reasoning_effort'),false);
     assert.equal(requests[0].body.messages[0].content,'SYSTEM');
     assert.equal(requests[0].body.messages[1].content,'USER');
   }finally{await closeLlmClient(client);}
@@ -106,11 +107,12 @@ test('Wizard CLI doctor and probe work with opt-in Ollama, without a Copilot log
   assert.equal(report.models[0].name,'qwen3:8b');
   const probe=await exec(process.execPath,[cli,'probe',
     '--llm-provider','ollama','--llm-url',baseUrl,
-    '--llm-model','qwen3:8b'],{timeout:12000});
+    '--llm-model','qwen3:8b','--llm-reasoning','none'],{timeout:12000});
   const result=JSON.parse(probe.stdout);
   assert.equal(result.provider,'ollama');
   assert.deepEqual(result.result,{ping:'pong'});
   assert.deepEqual(requests.map(r=>r.path),['/api/tags','/v1/chat/completions']);
+  assert.equal(requests[1].body.reasoning_effort,'none');
 });
 
 test('Ollama doctor times out and names its endpoint in the diagnostic',async t=>{
