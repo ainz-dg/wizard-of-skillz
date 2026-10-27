@@ -121,7 +121,7 @@ LLM defaults:
   --llm-provider claude-code-account  locally authenticated unmodified Claude Code CLI
   --llm-model <name>                  required for Ollama requests; Copilot defaults to auto
   --llm-url <url>                      Ollama defaults to http://127.0.0.1:11434/v1
-  --llm-reasoning <effort>            Copilot only: low|medium|high|xhigh|max
+  --llm-reasoning <effort>            Copilot: low|medium|high|xhigh|max; Ollama: forwards reasoning_effort
 
 Environment:
   WIZARD_LLM_PROVIDER=copilot|ollama|openai-compatible|codex-account|claude-code-account

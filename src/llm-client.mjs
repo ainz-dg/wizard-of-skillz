@@ -26,6 +26,7 @@ export class OpenAICompatibleClient {
     timeoutMs = 120000,
     temperature = 0,
     jsonMode = false,
+    reasoningEffort = null,
     fetchImpl = globalThis.fetch
   }) {
     if (!baseUrl) throw new Error('missing LLM baseUrl');
@@ -39,6 +40,7 @@ export class OpenAICompatibleClient {
     this.timeoutMs = timeoutMs;
     this.temperature = temperature;
     this.jsonMode = jsonMode;
+    this.reasoningEffort = reasoningEffort;
     this.fetchImpl = fetchImpl;
   }
 
@@ -62,6 +64,7 @@ export class OpenAICompatibleClient {
       ]
     };
     if (this.jsonMode) body.response_format = { type: 'json_object' };
+    if (this.reasoningEffort != null) body.reasoning_effort = this.reasoningEffort;
 
     try {
       const res = await this.fetchImpl(this.endpoint(), {

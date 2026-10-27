@@ -25,7 +25,7 @@ function endpoints(value){
 export class OllamaClient {
   constructor({
     baseUrl=DEFAULT_URL,model=null,timeoutMs=120000,
-    temperature=0,jsonMode=true,apiKey=null,fetchImpl=globalThis.fetch
+    temperature=0,jsonMode=true,reasoningEffort=null,apiKey=null,fetchImpl=globalThis.fetch
   }={}){
     if(typeof fetchImpl!=='function')throw Error('fetch is not available');
     const resolved=endpoints(baseUrl);
@@ -40,7 +40,7 @@ export class OllamaClient {
       throw Error('Ollama timeout must be a positive number of milliseconds');
     this.transport=this.model?new OpenAICompatibleClient({
       baseUrl:this.baseUrl,model:this.model,apiKey,
-      timeoutMs:this.timeoutMs,temperature,jsonMode,fetchImpl
+      timeoutMs:this.timeoutMs,temperature,jsonMode,reasoningEffort,fetchImpl
     }):null;
     this.apiKey=apiKey;
   }
