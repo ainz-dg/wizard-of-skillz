@@ -57,7 +57,8 @@ export function applyQualityGates(analysis, {
     let evidence_integrity = assessEvidence(evidence, {
       consumerRepo, providerRepo, consumerRoot, providerRoot, claimSourcePath:sourcePath
     });
-    const independent = evidence_integrity.checks.filter(e => e.status === 'REFERENCE_VALID');
+    const independent = evidence_integrity.independent_references ??
+      evidence_integrity.checks.filter(e => e.status === 'REFERENCE_VALID');
     if (evidence.length === 0) evidence_quality = 'NONE';
     else if (evidence_integrity.status === 'NOT_INSPECTED') evidence_quality = 'ROOT_NOT_AVAILABLE';
     else if (evidence_integrity.status === 'INVALID_ONLY') evidence_quality = 'INVALID_CITATIONS';

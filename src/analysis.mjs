@@ -4,14 +4,42 @@ import path from 'node:path';
 const STATUSES = new Set(['SUPPORTED','CONTRADICTED','DEPRECATED','NOT_FOUND','LOCAL_ONLY','NOT_CHECKED','NEEDS_REVIEW']);
 const CLASSES = new Set(['repo-domain','sdk-contract','shared-domain','agent-policy']);
 
-export function validateAnalysis(analysis, { consumerRoot, providerRoot }) {
+export function validateAnalysis(analysis, {
+  consumerRoot, providerRoot, consumerRepo, providerRepo
+} = {}) {
   const errors = [];
-  for (const item of analysis.claims ?? []) {
+  if (!analysis || typeof analysis !== 'object' || Array.isArray(analysis))
+    return ['analysis must be an object'];
+  if (!Array.isArray(analysis.claims))
+    return ['analysis.claims must be an array (raw batch checkpoints are not audit analyses)'];
+  if (typeof analysis.consumer_repo !== 'string' || !analysis.consumer_repo.trim())
+    errors.push('analysis.consumer_repo must be a non-empty string');
+  if (typeof analysis.provider_repo !== 'string' || !analysis.provider_repo.trim())
+    errors.push('analysis.provider_repo must be a non-empty string');
+  if (consumerRepo && analysis.consumer_repo !== consumerRepo)
+    errors.push(`analysis.consumer_repo does not match requested identity ${consumerRepo}`);
+  if (providerRepo && analysis.provider_repo !== providerRepo)
+    errors.push(`analysis.provider_repo does not match requested identity ${providerRepo}`);
+  for (const [index, item] of analysis.claims.entries()) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      errors.push(`claims[${index}] must be an object`);
+      continue;
+    }
     if (!item.claim_id) errors.push('claim without claim_id');
     if (!STATUSES.has(item.verification)) errors.push(`${item.claim_id}: invalid verification ${item.verification}`);
     if (item.knowledge_class && !CLASSES.has(item.knowledge_class)) errors.push(`${item.claim_id}: invalid knowledge_class ${item.knowledge_class}`);
+    if (item.evidence !== undefined && !Array.isArray(item.evidence)) {
+      errors.push(`${item.claim_id}: evidence must be an array`);
+      continue;
+    }
     for (const ev of item.evidence ?? []) {
-      const root = ev.repo === analysis.provider_repo ? providerRoot : consumerRoot;
+      if (!ev || typeof ev !== 'object' || typeof ev.repo !== 'string' ||
+          typeof ev.path !== 'string' || ev.path.includes('\0')) {
+        errors.push(`${item.claim_id}: invalid evidence reference`);
+        continue;
+      }
+      const root = ev.repo === analysis.provider_repo ? providerRoot :
+        ev.repo === analysis.consumer_repo ? consumerRoot : null;
       if (!root || !fs.existsSync(path.join(root, ev.path))) errors.push(`${item.claim_id}: missing evidence path ${ev.repo}:${ev.path}`);
     }
   }

@@ -34,6 +34,14 @@ export function deriveFindings(claims, { consumerRepo, providerRepo }) {
       findings.push({ ...base, type: 'REVIEW_REQUIRED', severity: 'medium', recommendation: 'VERIFY_BEFORE_EDIT', owner: c.owner ?? null, review_flags:c.review_flags??[] });
       continue;
     }
+    if (c.verification === 'SUPPORTED' && c.knowledge_class === 'sdk-contract' &&
+        c.owner === providerRepo && consumerRepo === providerRepo) {
+      findings.push({ ...base, type:'REVIEW_REQUIRED', severity:'medium',
+        recommendation:'VERIFY_BEFORE_EDIT', owner:c.owner,
+        review_flags:[...(c.review_flags??[]),'SINGLE_REPOSITORY_PROVIDER_NOT_DISTINCT'],
+        note:'A single-repository audit cannot establish a distinct provider owner for promotion.' });
+      continue;
+    }
     if (c.verification === 'SUPPORTED' && c.knowledge_class === 'sdk-contract' && c.owner === providerRepo) {
       findings.push({ ...base, type: 'PROMOTION_CANDIDATE', severity: 'medium', recommendation: 'VERIFY_SDK_OWNER_BEFORE_PROMOTE', owner: providerRepo });
       continue;
@@ -53,6 +61,7 @@ export function deriveFindings(claims, { consumerRepo, providerRepo }) {
     bySkill.get(c.skill).push(c);
   }
   for (const [skill, group] of bySkill) {
+    if (consumerRepo === providerRepo) continue;
     const sdkOwned = group.filter(c => c.knowledge_class === 'sdk-contract' && c.owner === providerRepo && c.verification === 'SUPPORTED');
     const local = group.filter(c => c.owner === consumerRepo && c.knowledge_class !== 'sdk-contract' && c.verification === 'SUPPORTED');
     if (sdkOwned.length && local.length) {
