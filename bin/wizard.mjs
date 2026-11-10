@@ -77,6 +77,42 @@ function assertRepoPath(label, root) {
   return resolved;
 }
 
+function validateRepoIdentity(id, label) {
+  if (typeof id !== 'string' || !id.trim() || id.trim() !== id || /[\0\r\n]/.test(id))
+    fail(`${label} must be a non-empty repository identity without surrounding whitespace`);
+  return id;
+}
+
+function classifyRepoPair(consumerRoot, providerRoot, consumerId, providerId) {
+  validateRepoIdentity(consumerId, 'consumer repository identity');
+  validateRepoIdentity(providerId, 'provider repository identity');
+  const sameRoot = fs.realpathSync(consumerRoot) === fs.realpathSync(providerRoot);
+  if (sameRoot && consumerId !== providerId)
+    fail('Consumer and provider resolve to the same repository root but have different identities');
+  if (!sameRoot && consumerId === providerId)
+    fail('Consumer and provider have the same identity but resolve to different repository roots');
+  return {sameRoot};
+}
+
+function singleRepositoryScopeReport({skills, repoId, installedScope, installedScopeBasis}) {
+  return {
+    schema_version:1,
+    basis:'NOT_APPLICABLE_SINGLE_REPOSITORY',
+    source_repo:repoId,
+    provider_repo:repoId,
+    installed_scope:installedScope,
+    installed_scope_basis:installedScopeBasis,
+    hints:[],
+    abstentions:skills.map(skill=>({skill:skill.id,path:skill.path,
+      reason:'INTER_REPOSITORY_SCOPE_NOT_APPLICABLE'})),
+    summary:{inspected_skills:skills.length,scope_hints:0,with_checked_references:0,
+      classification_only:0,abstained:skills.length},
+    confirmation_required:true,
+    write_authorized:false,
+    note:'Inter-repository scope hints do not apply to a single-repository audit; this is not a finding that the skills have no issues.'
+  };
+}
+
 const cmd = positional(0);
 const wizardVersion=JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.url),'utf8')).version;
 if (['-V','-v','--version','version'].includes(cmd)) {
@@ -502,11 +538,12 @@ if (cmd === 'evidence') {
   process.exit(0);
 }
 if (cmd === 'analyze') {
-  const consumerRoot = positional(1) ?? fail('missing consumer path');
-  const providerRoot = arg('--provider') ?? fail('missing --provider');
+  const consumerRoot = assertRepoPath('consumer',positional(1) ?? fail('missing consumer path'));
+  const providerRoot = assertRepoPath('provider',arg('--provider') ?? fail('missing --provider'));
   if (!has('--llm')) fail('analyze currently requires --llm');
-  const consumerId = arg('--consumer-id',localRepoId(consumerRoot));
-  const providerId = arg('--provider-id',localRepoId(providerRoot));
+  const consumerId = validateRepoIdentity(arg('--consumer-id',localRepoId(consumerRoot)),'consumer repository identity');
+  const providerId = validateRepoIdentity(arg('--provider-id',localRepoId(providerRoot)),'provider repository identity');
+  classifyRepoPair(consumerRoot,providerRoot,consumerId,providerId);
   const client = makeLlmClient();
   try {
     const analysis = await llmAnalysis({consumerRoot,providerRoot,consumerId,providerId,client});
@@ -628,6 +665,9 @@ if (cmd === 'audit') {
   assertOutputOutsideSources(out,[consumerRoot,providerRoot]);
   const consumerId = arg('--consumer-id',localRepoId(consumerRoot));
   const providerId = arg('--provider-id',localRepoId(providerRoot));
+  const repoPair = classifyRepoPair(consumerRoot,providerRoot,consumerId,providerId);
+  if (has('--llm') && arg('--analysis')) fail('choose exactly one of --llm or --analysis');
+  if (!has('--llm') && !arg('--analysis')) fail('use either --llm or --analysis <analysis.json>');
   // Auto recognizes only exact user-level skill installation roots.
   // An inspected checkout's .agents/skills remains repository-local.
   const install = resolveInstalledScope(consumerRoot,{
@@ -649,7 +689,8 @@ if (cmd === 'audit') {
     } else {
       const analysisPath = arg('--analysis') ?? fail('use either --llm or --analysis <analysis.json>');
       analysis = readJson(analysisPath);
-      const errors = validateAnalysis(analysis, { consumerRoot, providerRoot });
+      const errors = validateAnalysis(analysis, { consumerRoot, providerRoot,
+        consumerRepo:consumerId,providerRepo:providerId });
       if (errors.length) fail(`analysis validation failed:\n- ${errors.join('\n- ')}`);
     }
     analysis = applyQualityGates(analysis, {extractedClaims:extracted,consumerRoot,providerRoot,
@@ -659,7 +700,9 @@ if (cmd === 'audit') {
     const adapterReport = inspectSkillAdapters(skills);
     const sourceChecks = inspectSourceConsistency(consumerRoot,skills);
     const findings = deriveFindings(claims, { consumerRepo: consumerId, providerRepo: providerId });
-    const scopeHints = analyzeSkillScope({skills,claims,consumerRepo:consumerId,providerRepo:providerId,installedScope,installedScopeBasis:install.basis});
+    const scopeHints = repoPair.sameRoot ?
+      singleRepositoryScopeReport({skills,repoId:consumerId,installedScope,installedScopeBasis:install.basis}) :
+      analyzeSkillScope({skills,claims,consumerRepo:consumerId,providerRepo:providerId,installedScope,installedScopeBasis:install.basis});
     // The generic audit reports evidence and manual-only proposals;
     // it never fabricates ready-to-apply mechanical patches.
     const legacyRepairs = {

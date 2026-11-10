@@ -38,6 +38,19 @@ function chunk(arr, n) {
   return out;
 }
 
+export function mergeRetrievalCandidates(items, key, max = 18) {
+  const byPath = new Map();
+  for (const item of items) for (const ev of item[key] ?? []) {
+    const prev = byPath.get(ev.path);
+    const candidateRank=ev.snippet_score??0, previousRank=prev?.snippet_score??0;
+    if (!prev || candidateRank>previousRank ||
+        (candidateRank===previousRank&&ev.score>prev.score)) byPath.set(ev.path, ev);
+  }
+  return [...byPath.values()].sort((a,b) =>
+    (b.snippet_score??0)-(a.snippet_score??0) || b.score-a.score || a.path.localeCompare(b.path)
+  ).slice(0,max);
+}
+
 function normalizeItem(item, claimIdSet, consumerRepo, providerRepo) {
   if (!item || !claimIdSet.has(item.claim_id)) return null;
   const verification = STATUSES.has(item.verification) ? item.verification : 'NOT_CHECKED';
@@ -141,15 +154,6 @@ export async function analyzeClaimsWithLlm({
   const retrievalById = new Map(retrievalContext.map(x => [x.claim_id,x]));
   const all = [];
 
-  function mergeCandidates(items, key, max = 18) {
-    const byPath = new Map();
-    for (const item of items) for (const ev of item[key] ?? []) {
-      const prev = byPath.get(ev.path);
-      if (!prev || ev.score > prev.score) byPath.set(ev.path, ev);
-    }
-    return [...byPath.values()].sort((a,b) => b.score-a.score || a.path.localeCompare(b.path)).slice(0,max);
-  }
-
   const batches = chunk(extractedClaims, batchSize);
   let checkpoint = { schema_version:1, batches:{} };
   if (resume && checkpointPath && fs.existsSync(checkpointPath)) {
@@ -161,8 +165,8 @@ export async function analyzeClaimsWithLlm({
     const batch = batches[batchIndex];
     progress('batch:start', { batch: batchIndex + 1, batches: batches.length, claims: batch.length });
     const batchRetrieval = batch.map(c => retrievalById.get(c.id));
-    const sharedConsumer = mergeCandidates(batchRetrieval, 'consumer_candidates');
-    const sharedProvider = mergeCandidates(batchRetrieval, 'provider_candidates');
+    const sharedConsumer = mergeRetrievalCandidates(batchRetrieval, 'consumer_candidates');
+    const sharedProvider = mergeRetrievalCandidates(batchRetrieval, 'provider_candidates');
     // Any claim in a batch may cite any evidence actually shown to the model in that batch.
     for (const r of batchRetrieval) {
       r.consumer_candidates = sharedConsumer;

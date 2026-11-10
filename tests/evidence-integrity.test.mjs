@@ -86,6 +86,29 @@ test('valid reference does not imply semantic truth or automatic promotion',()=>
   assert.equal(qualitySummary(a).verification_basis.CITATION_ONLY,1);
 }));
 
+test('same-repository duplicate citations are one source and do not promote an unresolved claim',()=>{
+  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'wizard-evidence-same-root-'));
+  try{
+    const root=path.join(tmp,'repo');fs.mkdirSync(path.join(root,'src'),{recursive:true});
+    fs.writeFileSync(path.join(root,'src/Loader.java'),'class Loader { void dispatch() {} }');
+    const repo='org/repo';
+    const evidence=[
+      {repo,path:'src/Loader.java',symbol:'dispatch'},
+      {repo,path:'src/Loader.java',symbol:'dispatch'}
+    ];
+    const integrity=assessEvidence(evidence,{consumerRepo:repo,providerRepo:repo,consumerRoot:root,providerRoot:root});
+    assert.equal(integrity.checks.length,2);
+    assert.equal(integrity.independent_count,1);
+    const result=applyQualityGates({consumer_repo:repo,provider_repo:repo,claims:[{
+      claim_id:'rule:1',verification:'NEEDS_REVIEW',confidence:'low',knowledge_class:'repo-domain',
+      owner:repo,evidence
+    }]},{consumerRepo:repo,providerRepo:repo,consumerRoot:root,providerRoot:root});
+    assert.equal(result.claims[0].verification,'NEEDS_REVIEW');
+    assert.equal(result.claims[0].verification_basis,'CITATION_ONLY');
+    assert.equal(result.claims[0].evidence_integrity.independent_count,1);
+  }finally{fs.rmSync(tmp,{recursive:true,force:true});}
+});
+
 test('missing roots never silently downgrade a claim to contradiction',()=>{
   const a=applyQualityGates({consumer_repo:consumerRepo,provider_repo:providerRepo,claims:[{
     claim_id:'rule:1',verification:'SUPPORTED',confidence:'medium',knowledge_class:'sdk-contract',owner:providerRepo,

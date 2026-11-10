@@ -43,7 +43,20 @@ export function checkEvidenceReference(ev, { consumerRepo, providerRepo, consume
 export function assessEvidence(evidence, opts = {}) {
   const checks = (Array.isArray(evidence)?evidence:[]).map(e=>checkEvidenceReference(e,opts));
   const valid = checks.filter(x=>VALID.has(x.status));
-  const independent = valid.filter(x=>x.status === 'REFERENCE_VALID');
+  const independent = [];
+  const seenSources = new Set();
+  for (const check of valid) {
+    if (check.status !== 'REFERENCE_VALID') continue;
+    const root = check.repo === opts.consumerRepo ? opts.consumerRoot : opts.providerRoot;
+    if (!root) continue;
+    try {
+      const source = fs.realpathSync(path.resolve(fs.realpathSync(root),check.path));
+      if (!seenSources.has(source)) {
+        seenSources.add(source);
+        independent.push(check);
+      }
+    } catch { /* The check result already records unavailable or invalid paths. */ }
+  }
   const invalid = checks.filter(x=>!VALID.has(x.status) && x.status!=='ROOT_UNAVAILABLE');
   const unavailable = checks.filter(x=>x.status === 'ROOT_UNAVAILABLE');
   let status = 'NO_EVIDENCE';
@@ -55,6 +68,7 @@ export function assessEvidence(evidence, opts = {}) {
     else status='VALID_REFERENCES_ONLY';
   }
   return {status,checks,valid_count:valid.length,independent_count:independent.length,
+    independent_references:independent,
     invalid_count:invalid.length,unavailable_count:unavailable.length,
     note:'File and optional symbol existence only; no semantic entailment performed.'};
 }

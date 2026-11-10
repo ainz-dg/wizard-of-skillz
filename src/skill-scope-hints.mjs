@@ -141,6 +141,8 @@ export function skillScopeMarkdown(report) {
     '**Diagnosi, non MOVE. Destinazione sconosciuta. Nessuna modifica autorizzata.**','',
     'Le classificazioni dei claim sono indizi da verificare, non dimostrazioni di ownership.',''
   ];
+  if(report.basis==='NOT_APPLICABLE_SINGLE_REPOSITORY')
+    lines.push('Scope inter-repository: **non applicabile**. Nessuna diagnosi di scope non significa che le skill non abbiano problemi.','');
   if (report.summary) lines.push('Skill analizzate: '+report.summary.inspected_skills+
     '; diagnosi: '+report.summary.scope_hints+'; astensioni: '+report.summary.abstained+'.','');
   if (!report.hints.length) lines.push('Nessun indizio sufficientemente classificato per suggerire una variazione di scope.','');
