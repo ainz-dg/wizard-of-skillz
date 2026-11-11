@@ -1,10 +1,25 @@
 # Wizard of Skillz
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ainz-dg/wizard-of-skillz/main/docs/assets/wizard-pixel.svg" alt="Wizard of Skillz pixel-art wizard mascot" width="240" />
+</p>
+
 **Keep your skills where they belong.**
 
 A generic, terminal-first, human-controlled assistant for reviewing and maintaining [Agent Skills](https://agentskills.io/).
 
-**Status:** `0.5.0-rc.4` is the currently published experimental prerelease. `0.5.0-rc.5` is being prepared for review and is **not published**; `npm`'s `next` dist-tag remains on the published version until the owner approves and publishes a GitHub prerelease.
+**Status:** [`0.5.0-rc.5`](https://github.com/ainz-dg/wizard-of-skillz/releases/tag/v0.5.0-rc.5) is published as an experimental prerelease on npm (`next`).
+
+## Install and launch
+
+Requires Node.js **22.12 or later**. Open a terminal and run:
+
+```sh
+npx --yes wizard-of-skillz@next
+```
+
+Or pin the tested prerelease: `npx --yes wizard-of-skillz@0.5.0-rc.5`.
+The TUI starts in the current directory; choose **Scegli il progetto da analizzare** to select another local repository. Initial scans are offline; using an AI provider and applying edits require explicit actions. For your first run, choose a disposable, non-sensitive project. See the [TUI quickstart](docs/TUI-QUICKSTART.md).
 
 ## Use Wizard: TUI first
 
@@ -15,9 +30,9 @@ and offers guided paths to choose another repository, analyze existing skills,
 review documented-domain sources, examine proposals and select an AI provider.
 Choosing resources never requires a separate CLI command.
 
-## Try Wizard
+## Try from a source checkout (contributors)
 
-Requires Node.js 22.12 or later. In a clean checkout:
+For developers working on Wizard itself:
 
 ```sh
 npm ci
@@ -63,15 +78,7 @@ See [domain guide](docs/DOCUMENTED-DOMAIN.md) and
 Account-backed Codex and Claude Code adapters have simulated CI tests but still
 require real-account smoke tests and compliance with each provider's terms.
 
-After the owner publishes `0.5.0-rc.5`, install that exact version or use the `next` dist-tag:
-
-```sh
-npx wizard-of-skillz@0.5.0-rc.5
-# or, after the same publication updates the dist-tag:
-npx wizard-of-skillz@next
-```
-
-Until that publication, `npx wizard-of-skillz@next` still installs the already published `0.5.0-rc.4`, which does not include the changes prepared for rc.5. Pin a specific version for repeatable installations.
+Pin a specific npm version for repeatable installs; `@next` tracks the currently published experimental prerelease.
 
 ## How it works
 
@@ -83,4 +90,4 @@ See [TUI quickstart](docs/TUI-QUICKSTART.md), [LLM provider and Ollama setup](do
 
 ## Open source readiness
 
-**License:** [Apache License 2.0](LICENSE). The experimental releases `0.5.0-rc.3` and `0.5.0-rc.4` are published and verified. Candidate `0.5.0-rc.5` includes the reviewed same-repository audit and bounded evidence-selection fixes. Merges never publish: the owner must explicitly publish a GitHub prerelease. See the [release guide](docs/RELEASING.md) and [rc.5 notes](https://github.com/ainz-dg/wizard-of-skillz/blob/main/docs/releases/0.5.0-rc.5.md).
+**License:** [Apache License 2.0](LICENSE). The published `0.5.0-rc.5` prerelease includes the reviewed same-repository audit and bounded evidence-selection fixes. Merges never publish: the owner must explicitly publish a GitHub prerelease. See the [release guide](docs/RELEASING.md) and [rc.5 notes](docs/releases/0.5.0-rc.5.md).

@@ -14,11 +14,11 @@ resource directory explicitly.
 
 ## Guided TUI (recommended)
 
-From the Wizard checkout, run:
+With the npm release, run:
 
 
 ```sh
-node bin/wizard.mjs scan /path/to/disposable-domain-repository
+npx --yes wizard-of-skillz@next scan /path/to/disposable-domain-repository
 ```
 
 In the TUI overview press **D**. Enter the path to the declared resources
@@ -30,14 +30,14 @@ arrow keys and **Enter** to read their full text; no installation or Apply occur
 
 ## Read-only inventory
 
-    node bin/wizard.mjs domain ./example --resources resources --out /tmp/wizard-domain-audit
+    npx --yes wizard-of-skillz@next domain ./example --resources resources --out /tmp/wizard-domain-audit
 
 This lists a bounded snapshot of resource documents and existing skills. It does
 not contact a model or suggest skills without model evidence.
 
 ## Propose reviewable skills
 
-    node bin/wizard.mjs domain ./example --resources resources --skills skills --llm \
+    npx --yes wizard-of-skillz@next domain ./example --resources resources --skills skills --llm \
       --llm-provider copilot --out /tmp/wizard-domain-review
 
 This **explicitly** calls the selected model, sending bounded local resource
