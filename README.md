@@ -4,7 +4,7 @@
 
 A generic, terminal-first, human-controlled assistant for reviewing and maintaining [Agent Skills](https://agentskills.io/).
 
-**Status:** `0.5.0-rc.3` is published as an experimental prerelease. `0.5.0-rc.4` is a release-engineering candidate to validate automatic npm publication through GitHub OIDC; no new product features are included.
+**Status:** `0.5.0-rc.4` is the currently published experimental prerelease. `0.5.0-rc.5` is being prepared for review and is **not published**; `npm`'s `next` dist-tag remains on the published version until the owner approves and publishes a GitHub prerelease.
 
 ## Use Wizard: TUI first
 
@@ -63,13 +63,15 @@ See [domain guide](docs/DOCUMENTED-DOMAIN.md) and
 Account-backed Codex and Claude Code adapters have simulated CI tests but still
 require real-account smoke tests and compliance with each provider's terms.
 
-Install or run the current experimental prerelease from npm:
+After the owner publishes `0.5.0-rc.5`, install that exact version or use the `next` dist-tag:
 
 ```sh
+npx wizard-of-skillz@0.5.0-rc.5
+# or, after the same publication updates the dist-tag:
 npx wizard-of-skillz@next
 ```
 
-The `next` dist-tag follows the currently approved experimental prerelease. Pin a specific version for repeatable installations.
+Until that publication, `npx wizard-of-skillz@next` still installs the already published `0.5.0-rc.4`, which does not include the changes prepared for rc.5. Pin a specific version for repeatable installations.
 
 ## How it works
 
@@ -81,4 +83,4 @@ See [TUI quickstart](docs/TUI-QUICKSTART.md), [LLM provider and Ollama setup](do
 
 ## Open source readiness
 
-**License:** [Apache License 2.0](LICENSE). The [first experimental release, `0.5.0-rc.3`](https://github.com/ainz-dg/wizard-of-skillz/releases/tag/v0.5.0-rc.3), was published on npm with a one-time manual bootstrap and verified by GitHub Actions. Candidate `0.5.0-rc.4` validates the first **automatic** npm Trusted Publishing flow using GitHub OIDC, without adding features. Merges never publish: the owner must explicitly publish a GitHub prerelease. See the [release guide](docs/RELEASING.md) and [rc.4 notes](docs/releases/0.5.0-rc.4.md).
+**License:** [Apache License 2.0](LICENSE). The experimental releases `0.5.0-rc.3` and `0.5.0-rc.4` are published and verified. Candidate `0.5.0-rc.5` includes the reviewed same-repository audit and bounded evidence-selection fixes. Merges never publish: the owner must explicitly publish a GitHub prerelease. See the [release guide](docs/RELEASING.md) and [rc.5 notes](https://github.com/ainz-dg/wizard-of-skillz/blob/main/docs/releases/0.5.0-rc.5.md).

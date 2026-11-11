@@ -1,5 +1,22 @@
 # Wizard of Skillz — TUI quickstart
 
+## Install from npm
+
+The `0.5.0-rc.5` prerelease is still under review. After the owner publishes it,
+run the pinned version or the `next` dist-tag in a terminal:
+
+```sh
+npx wizard-of-skillz@0.5.0-rc.5
+# or, after publication:
+npx wizard-of-skillz@next
+```
+
+Until then, `@next` remains on published `0.5.0-rc.4`. Use a disposable local
+repository for a first run. The no-argument command opens the TUI in the current
+directory; choose **Scegli il progetto da analizzare** to scan another checkout.
+
+## Start from a source checkout
+
 Start Wizard from an interactive terminal with no arguments: **the TUI is the primary interface**. It starts from the current directory; use **Scegli il progetto da analizzare** in the main menu to open a different local repository. Existing Agent Skills are optional for documented-domain workflows. Opening or switching projects performs an offline structural scan before human review. `wizard scan <repo> --out <fresh-directory>` writes a read-only report outside the inspected repository.
 
 
