@@ -213,3 +213,9 @@ test('offline review without client does not advertise an unavailable semantic m
   assert.doesNotMatch(screen,/Analizza le skill con l’AI/);
   assert.match(screen,/↑↓ Scegli/);
 });
+
+test('Codex picker does not advertise a model catalog',()=>{
+  const footer=commandHints('overview',{wizardStep:'model',wizardProvider:'codex-account'});
+  assert.match(footer[0],/predefinito/);
+  assert.doesNotMatch(footer[0],/TAB Elenca modelli/);
+});

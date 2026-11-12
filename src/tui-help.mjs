@@ -5,13 +5,15 @@
 export function commandHints(view,{
   narrow=false,searching=false,modelConfigured=false,providerPickerEnabled=false,
   editorConfigured=false,hasSemanticReport=false,applyConfigured=false,
-  proposalCount=0,twoPane=false,wizardStep=null
+  proposalCount=0,twoPane=false,wizardStep=null,wizardProvider=null
 }={}){
   if(wizardStep==='menu')
     return ['1 Copilot  2 Ollama locale  3 Ollama remoto  4 Codex  5 Claude',
       'ESC Annulla scelta'];
   if(wizardStep==='model')
-    return ['INVIO Conferma modello  TAB Elenca modelli','ESC Annulla scelta'];
+    return wizardProvider==='codex-account'?
+      ['INVIO ID oppure predefinito  TAB non disponibile','ESC Annulla scelta']:
+      ['INVIO Conferma modello  TAB Elenca modelli','ESC Annulla scelta'];
   if(wizardStep==='models')
     return ['↑↓ Naviga  INVIO Scegli modello  T Digita nome','ESC Torna'];
   if(wizardStep==='url')

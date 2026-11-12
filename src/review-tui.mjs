@@ -269,7 +269,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
 
     }
     return pinCommandHints(lines,commandHints(state.view,{
-      wizardStep:providerWizard.step
+      wizardStep:providerWizard.step,wizardProvider:providerWizard.draft?.provider
     }),{height,width,fmt});
   }
   if(projectWizard){
