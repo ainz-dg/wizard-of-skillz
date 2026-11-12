@@ -21,6 +21,11 @@ For Claude Code:
     npx --yes wizard-of-skillz@next doctor --llm-provider claude-code-account
     npx --yes wizard-of-skillz@next probe --llm-provider claude-code-account
 
+Wizard passes Codex's global approval flag before `exec` and uses a read-only
+sandbox, without granting extra permissions. In the TUI, choose an optional
+Codex model ID or leave it empty to use the installed CLI's default. Wizard
+does not offer Codex model discovery; use the official CLI to identify IDs.
+
 Codex runs exec in an isolated temporary working directory with a read-only
 sandbox and no repository checkout. Codex retains its built-in read-only tools;
 the wrapper does not grant writes but cannot promise filesystem read isolation

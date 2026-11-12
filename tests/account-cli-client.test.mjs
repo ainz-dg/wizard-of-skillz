@@ -46,7 +46,8 @@ test('factory and TUI accept optional account providers without a model or API k
     assert.equal(c.provider,provider);
     assert.equal(c.auth,'local-cli-user-account');
     assert.equal(validateProviderSelection({provider,model:''}).provider,provider);
-    assert.match(providerDescription({provider}),/account locale/);
+    assert.match(providerDescription({provider}),
+      provider==='codex-account'?/modello predefinito/:/account locale/);
   }
 });
 test('doctor only inspects existing CLI authentication status',async()=>{
