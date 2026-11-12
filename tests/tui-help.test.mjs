@@ -197,7 +197,7 @@ test('after semantic triage, next action becomes J, with visible hypothesis coun
 test('help is contextual rather than dumping every command in the initial overview',()=>{
   const screen=render('help',{rows:35,state:{helpReturnView:'overview'}});
   assert.match(screen,/IN QUESTA SCHERMATA/);
-  assert.match(screen,/QUI: ↑↓ sceglie fra analizzare/);
+  assert.match(screen,/QUI: puoi leggere gli esiti, rifare l’analisi/);
   assert.match(screen,/SCORCIATOIE AVANZATE/);
   assert.ok(!screen.includes('ALTRE AZIONI: B scarta visibili'));
   const list=render('help',{rows:35,state:{helpReturnView:'list'}});

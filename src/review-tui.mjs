@@ -357,14 +357,17 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
     const compact=height<20;
     // At 12 rows, reserve the footer and keep all menu choices visible.
     if(height<=12){
-      lines.push(fmt((localScan?localScan.skill_count+' skill individuate':
-        'Proposte strutturali: '+items.length)+' · Proposte: '+items.length,'bold'),
-        fmt('COSA VUOI FARE?   ↑↓ e INVIO','cyan'));
+      // A 60×12 viewport has room for all six actions only if we omit the
+      // optional count line; three footer rows remain reserved.
+      if(options.length<=5)lines.push(fmt((localScan?
+        localScan.skill_count+' skill individuate':'Proposte strutturali: '+items.length)+
+        ' · Proposte: '+items.length,'bold'));
+      lines.push(fmt('COSA VUOI FARE?   ↑↓ e INVIO','cyan'));
       for(const option of options)
         lines.push(fmt((option.id===active?.id?'  ❯ ':'    ')+option.title,
           option.id===active?.id?'cyan':'bold'));
       // Show all actions at 60×12, including rerun and project navigation.
-      const available=height-2-lines.length; // two lines reserved for keyboard hints
+      const available=height-3-lines.length; // separator + two keyboard hint rows
       if(active&&available>=2)lines.push('',fmt('  '+active.description,'gray'));
       else if(active&&available>=1)lines.push(fmt('  '+active.description,'gray'));
       return pinCommandHints(lines,commandHints(state.view,{

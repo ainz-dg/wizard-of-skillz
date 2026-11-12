@@ -108,7 +108,7 @@ test('guided overview starts read-only, preserves selection and returns from lis
     scopeHints:{hints:[{}]},sourceChecks:{observations:[{},{}]}});
   assert.match(summary,/COSA VUOI FARE/);
   assert.match(summary,/Esamina le proposte locali \(3\)/);
-  assert.match(summary,/verifica semantica non inclusa/);
+  assert.match(summary,/Scansione strutturale completata \(offline, senza AI\)/);
   assert.match(summary,/↑↓ Scegli/);
   assert.equal(summary.includes(String.fromCharCode(27)),false);
   state=updateTuiState(state,'space',3);
