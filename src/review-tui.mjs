@@ -390,7 +390,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
       lines.push(fmt('Audit LLM: '+semanticAudit.claims_checked+' claim, '+
         semanticAudit.proposed_updates+' ipotesi UPDATE · NON sono prove.','yellow'));
     else
-      lines.push(fmt('Audit semantico: non ancora eseguito.','yellow'));
+      lines.push(fmt('Audit semantico: non ancora eseguito (facoltativo: K).','yellow'));
     if(!compact)lines.push('');
     lines.push(fmt('COSA VUOI FARE?   ↑↓ e INVIO','cyan'));
     for(const option of options)
@@ -674,6 +674,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     projectRoot:consumerRoot,canChooseProject:true,canUseDomain:Boolean(consumerRoot)
   }));
   let busy=false;
+  let auditController=null;
   const draftIds=()=>{
     if(state.view!=='list'||state.searching||!consumerRoot)
       throw Error('Apri la lista con un progetto esplicito per preparare la patch');
@@ -749,8 +750,11 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       try{validateProviderSelection(providerSelection);}
       catch(error){state.notice='LLM: '+error.message+' (L per configurare).';draw();return;}
     }
+    const controller=new AbortController();
+    auditController=controller;
     busy=true;
-    state.notice='Audit semantico richiesto: skill e frammenti di codice saranno inviati al modello.';
+    state.notice='Analisi AI facoltativa: '+providerDescription(providerSelection)+
+      ' · ESC annulla';
     draw();
     let client;
     try{
@@ -760,7 +764,12 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       const target=scan?.output_directory??folder;
       client=typeof providerFactory==='function'?
         providerFactory({...providerSelection}):clientFactory();
-      const report=await performSemanticAudit(target,{consumerRoot,client});
+      const report=await performSemanticAudit(target,{consumerRoot,client,
+        signal:controller.signal,onProgress:({claim,total})=>{
+          state.notice='Analisi AI '+claim+'/'+total+' · '+providerDescription(providerSelection)+
+            ' · ESC annulla';
+          draw();
+        }});
       const previousSelected=fresh?[]:state.selected.map(i=>catalog.items[i]?.id);
       const previousDiscarded=fresh?[]:state.discarded.map(i=>catalog.items[i]?.id);
       if(scan){
@@ -781,8 +790,12 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         notice:(scan?'Nuova sessione; analisi precedente conservata. ':'')+
           'Audit terminato: '+report.claims_checked+' claim, '+
           report.proposed_updates+' ipotesi UPDATE. Nessuna scrittura nel progetto.'};
-    }catch(error){state.notice='AUDIT SEMANTICO: '+error.message;}
-    finally{
+    }catch(error){
+      state.notice=controller.signal.aborted?
+        'Analisi AI annullata. Risultati precedenti invariati.':
+        'AUDIT SEMANTICO: '+error.message;
+    }finally{
+      auditController=null;
       try{await closeLlmClient(client);}catch(error){state.notice+=' · '+error.message;}
       busy=false;draw();
     }
@@ -1107,7 +1120,14 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
   const handler=(ch,key={})=>{
     const command=key.name==='return'?'enter':key.name==='space'?'space':
       key.name==='escape'?'escape':key.name || ch;
-    if(busy)return;
+    if(busy){
+      if(auditController && (command==='escape'||(key.ctrl&&command==='c'))){
+        auditController.abort();
+        state.notice='Annullamento richiesto; attendo la richiesta AI in corso...';
+        draw();
+      }
+      return;
+    }
     if(key.ctrl&&command==='c'){finish();return;}
     if(providerWizard){
       try{providerKey(ch,command);}catch(error){state.notice='LLM: '+error.message;}

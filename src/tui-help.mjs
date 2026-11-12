@@ -80,9 +80,9 @@ export function commandHints(view,{
 export const HELP_LINES=[
   'COME FUNZIONA',
   '1. SCANSIONE: il comando wizard scan controlla struttura e link senza modelli.',
-  '2. ANALISI: L sceglie il modello (senza inferenza); K invia claim e snippet.',
+  '2. ANALISI FACOLTATIVA: L sceglie il modello; K invia claim e snippet.',
   '   Dal menu: scegli il progetto e le risorse, M prepara una richiesta, Y autorizza invio AI.',
-  '3. VERIFICA: J mostra gli esiti; K dopo un audit crea una nuova sessione.',
+  '3. VERIFICA: J mostra gli esiti; K ripete con una nuova sessione. ESC annulla.',
   '4. PROPOSTA DI MODIFICA: M chiede all’AI un SKILL.md completo rivisto (solo UPDATE).',
   '   E permette una modifica con editor; P mostra il diff. Nessuna scrittura nel progetto.',
   '5. REVISIONE E DECISIONE: leggi tutto il diff, SPAZIO seleziona, G verifica il lotto;',
@@ -101,7 +101,7 @@ export function contextualHelp(view){
       return [
         'QUI: puoi leggere gli esiti, rifare l’analisi e valutare le proposte.',
         'Dal menu puoi anche scegliere il progetto e lavorare sulle risorse documentali.',
-        'L sceglie il modello, K avvia l’analisi, M crea una bozza da una proposta.',
+        'Scansione offline automatica; K avvia l’analisi AI facoltativa.',
         'Le risorse documentali aprono una guida con fonti, consenso e bozze da approvare.',
         'Non serve ricordare i tasti per utilizzare il Mago.'
       ];

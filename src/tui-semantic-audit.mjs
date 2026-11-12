@@ -76,7 +76,9 @@ function validSource(root,relative,quote,expectedHash){
   }catch{return null;}
 }
 
-export async function performSemanticAudit(auditFolder,{consumerRoot,client,maxClaims=MAX_CLAIMS}={}){
+export async function performSemanticAudit(auditFolder,{
+  consumerRoot,client,maxClaims=MAX_CLAIMS,signal=null,onProgress=null
+}={}){
   if(!client||typeof client.completeJson!=='function')
     throw Error('Choose an LLM provider before semantic audit');
   const {audit,root}=guardWorkspace(auditFolder,consumerRoot);
@@ -94,6 +96,8 @@ export async function performSemanticAudit(auditFolder,{consumerRoot,client,maxC
   const claims=extracted.slice(0,maxClaims);
   const sourceIndex=buildEvidenceIndex(root);
   const findings=[],newProposals=[];
+  const checkCancel=()=>{if(signal?.aborted)throw Error('Semantic audit cancelled');};
+  checkCancel();
   const prompt=[
     'You are reviewing a software Agent Skill statement against independent repository source.',
     'Return JSON ONLY: {"verdict":"SUPPORTED|SUSPECTED_CONTRADICTION|INSUFFICIENT_EVIDENCE",',
@@ -104,7 +108,9 @@ export async function performSemanticAudit(auditFolder,{consumerRoot,client,maxC
     'Do not treat an absence of evidence as contradiction. If uncertain, use INSUFFICIENT_EVIDENCE.',
     'Do not suggest file writes, run tools, create skills or claim independent semantic verification.'
   ].join(' ');
-  for(const claim of claims){
+  for(const [index,claim] of claims.entries()){
+    checkCancel();
+    onProgress?.({claim:index+1,total:claims.length});
     const candidates=retrieveForClaim(sourceIndex.filter(d=>d.path!==claim.source_path),
       claim,MAX_EVIDENCE);
     let response=null;
@@ -112,8 +118,9 @@ export async function performSemanticAudit(auditFolder,{consumerRoot,client,maxC
       response=await client.completeJson({system:prompt,user:JSON.stringify({
         claim:{id:claim.stable_id,skill:claim.source_path,statement:claim.statement},
         source_candidates:candidates.map(c=>({path:c.path,line:c.line,snippet:c.snippet}))
-      })});
+      }),signal});
     }
+    checkCancel();
     const raw=response&&typeof response==='object'&&!Array.isArray(response)?response:{};
     const verdict=MODEL_VERDICTS.has(raw.verdict)?raw.verdict:'INSUFFICIENT_EVIDENCE';
     const cited=candidates.find(c=>c.path===raw.citation?.path);
@@ -157,6 +164,7 @@ export async function performSemanticAudit(auditFolder,{consumerRoot,client,maxC
         'Proposta solo manuale; nessuna patch o approvazione implicita.']
     });
   }
+  checkCancel();
   // Reject TOCTOU changes even when all claims were classified as supported:
   // findings must describe the exact skill snapshot that was inspected.
   for(const skill of skills){
@@ -171,6 +179,7 @@ export async function performSemanticAudit(auditFolder,{consumerRoot,client,maxC
       throw Error('Quoted evidence changed while the semantic audit was running; retry');
   }
   // Never invalidate existing staged patches by changing their proposal digest.
+  checkCancel();
   ensureNoPreparedCandidates(audit);
   if(readSafe(file)!==original)throw Error('Review catalog changed during audit; retry');
   const retained=source.proposals.filter(p=>p.kind!=='SEMANTIC_REVIEW_CANDIDATE');
@@ -184,6 +193,7 @@ export async function performSemanticAudit(auditFolder,{consumerRoot,client,maxC
     write_authorized:false,applied_count:0,semantic_proof:false,
     note:'Model opinions; exact citation existence checked, semantic entailment NOT proven.'
   };
+  checkCancel();
   writeAtomic(audit,PROPOSALS,JSON.stringify(merged,null,2)+'\n');
   writeAtomic(audit,REPORT,JSON.stringify(report,null,2)+'\n');
   return report;

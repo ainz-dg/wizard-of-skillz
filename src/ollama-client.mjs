@@ -45,10 +45,10 @@ export class OllamaClient {
     this.apiKey=apiKey;
   }
 
-  async completeJson({system,user}){
+  async completeJson({system,user,signal=null}){
     if(!this.transport)
       throw Error('Ollama requires --llm-model <name> (or WIZARD_LLM_MODEL). Run wizard doctor --llm-provider ollama to list installed models.');
-    return this.transport.completeJson({system,user});
+    return this.transport.completeJson({system,user,signal});
   }
 
   async doctor(){
