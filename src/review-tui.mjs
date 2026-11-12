@@ -674,7 +674,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     projectRoot:consumerRoot,canChooseProject:true,canUseDomain:Boolean(consumerRoot)
   }));
   let busy=false;
-  let auditController=null;
+  let activeController=null;
   const draftIds=()=>{
     if(state.view!=='list'||state.searching||!consumerRoot)
       throw Error('Apri la lista con un progetto esplicito per preparare la patch');
@@ -751,7 +751,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       catch(error){state.notice='LLM: '+error.message+' (L per configurare).';draw();return;}
     }
     const controller=new AbortController();
-    auditController=controller;
+    activeController=controller;
     busy=true;
     state.notice='Analisi AI facoltativa: '+providerDescription(providerSelection)+
       ' · ESC annulla';
@@ -795,7 +795,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         'Analisi AI annullata. Risultati precedenti invariati.':
         'AUDIT SEMANTICO: '+error.message;
     }finally{
-      auditController=null;
+      activeController=null;
       try{await closeLlmClient(client);}catch(error){state.notice+=' · '+error.message;}
       busy=false;draw();
     }
@@ -991,7 +991,11 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
   };
   const discoverModels=async()=>{
     if(providerWizard?.step!=='model'||typeof providerFactory!=='function')return;
+    const controller=new AbortController();
+    activeController=controller;
     busy=true;
+    state.notice='Lettura modelli in corso... ESC annulla; Ollama max 15s.';
+    draw();
     let client;
     try{
       const draft={...providerWizard.draft,model:''};
@@ -999,7 +1003,9 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       client=providerFactory(draft);
       if(typeof client?.doctor!=='function')
         throw Error('Il provider non supporta l’elenco modelli');
-      const info=await client.doctor();
+      const info=await client.doctor(draft.provider==='ollama'?
+        {signal:controller.signal,timeoutMs:15000}:{});
+      if(controller.signal.aborted)throw Error('Ricerca modelli annullata');
       const models=(info.models??[]).map(m=>m?.id??m?.model??m?.name).filter(Boolean);
       if(draft.provider==='copilot')models.unshift('auto');
       if(!models.length)throw Error('Nessun modello disponibile sul server Ollama.');
@@ -1007,8 +1013,11 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       providerWizard={...providerWizard,step:'models',models:unique,
         modelCursor:Math.max(0,unique.indexOf(providerWizard.text))};
       state.notice='Scegli un modello. Nessuna generazione effettuata.';
-    }catch(error){state.notice='Elenco modelli: '+error.message;}
-    finally{
+    }catch(error){
+      state.notice=controller.signal.aborted?'Ricerca modelli annullata.':
+        'Elenco modelli: '+error.message;
+    }finally{
+      activeController=null;
       try{await closeLlmClient(client);}catch{}
       busy=false;draw();
     }
@@ -1121,9 +1130,9 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     const command=key.name==='return'?'enter':key.name==='space'?'space':
       key.name==='escape'?'escape':key.name || ch;
     if(busy){
-      if(auditController && (command==='escape'||(key.ctrl&&command==='c'))){
-        auditController.abort();
-        state.notice='Annullamento richiesto; attendo la richiesta AI in corso...';
+      if(activeController && (command==='escape'||(key.ctrl&&command==='c'))){
+        activeController.abort();
+        state.notice='Annullamento richiesto; attendo la richiesta in corso...';
         draw();
       }
       return;

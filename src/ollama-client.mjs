@@ -51,9 +51,12 @@ export class OllamaClient {
     return this.transport.completeJson({system,user,signal});
   }
 
-  async doctor(){
+  async doctor({signal=null,timeoutMs=this.timeoutMs}={}){
     const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),this.timeoutMs);
+    const cancel=()=>controller.abort();
+    signal?.addEventListener('abort',cancel,{once:true});
+    if(signal?.aborted)cancel();
+    const timer=setTimeout(()=>controller.abort(),timeoutMs);
     let response;
     try{
       response=await this.fetchImpl(this.tagsUrl,{
@@ -76,7 +79,11 @@ export class OllamaClient {
     }catch(error){
       throw Error('Cannot query Ollama models at '+this.tagsUrl+
         '. Check that Ollama is running and --llm-url is correct. ('+
-        (controller.signal.aborted?'request timed out':error.message)+')');
-    }finally{clearTimeout(timer);}
+        (signal?.aborted?'request cancelled':
+          controller.signal.aborted?'request timed out':error.message)+')');
+    }finally{
+      clearTimeout(timer);
+      signal?.removeEventListener('abort',cancel);
+    }
   }
 }

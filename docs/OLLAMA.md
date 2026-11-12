@@ -41,6 +41,8 @@ provider/model appears in the status line. **K** starts an optional semantic
 audit; **M** on a selected UPDATE prepares a proposed new skill. During the
 audit, the TUI shows progress (claim X/Y) and **Esc** cancels the in-flight
 Ollama request. Individual requests have a bounded timeout with a clear error.
+Model discovery with **TAB** has a separate 15-second timeout and can also
+be cancelled with **Esc**.
 **G → Y** is still separate approval
 for applying any source change.
 

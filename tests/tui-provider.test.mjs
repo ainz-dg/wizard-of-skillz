@@ -247,3 +247,24 @@ test('Codex selection allows default model or explicit ID, without a model reque
     t.key('q');await task;
   }finally{cleanup(p);}
 });
+
+test('TAB Ollama discovery supports Esc cancellation without changing provider',async()=>{
+  const p=project(),t=terminal();let cancelled=false;
+  try{
+    const task=runReviewTui(p.folder,{consumerRoot:p.root,input:t.input,output:t.output,
+      providerFactory:()=>({doctor:({signal})=>new Promise((_res,reject)=>{
+        signal.addEventListener('abort',()=>{
+          cancelled=true;reject(Error('aborted'));
+        },{once:true});
+      })})});
+    t.key('l');t.key('2');t.key('tab');
+    assert.match(t.output.text,/Lettura modelli in corso/);
+    t.key('escape');
+    for(let i=0;i<20&&!cancelled;i++)await tick();
+    assert.equal(cancelled,true);
+    assert.match(t.output.text,/Ricerca modelli annullata/);
+    t.key('escape');
+    assert.match(t.output.text,/Copilot · auto/);
+    t.key('q');await task;
+  }finally{cleanup(p);}
+});
