@@ -243,7 +243,7 @@ test('a second AI audit with a different model preserves the previous report',as
     assert.equal(JSON.parse(original).provider,'copilot');
     x.key('escape');
     assert.match(x.screen(),/Nuova analisi AI/);
-    x.key('l');x.key('4'); // choose Codex CLI; changing provider does not call it
+    x.key('l');x.key('4');x.key('return'); // Codex CLI default; no inference
     assert.equal(calls.length,2);
     assert.match(x.screen(),/K analizza le skill/);
     x.key('down');x.key('return'); // new independent analysis session

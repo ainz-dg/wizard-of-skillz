@@ -247,11 +247,14 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
         fmt('> '+providerWizard.text,'cyan'),
         '');
     }else if(providerWizard.step==='model'){
-      const copilot=providerWizard.draft.provider==='copilot';
-      lines.push(fmt(copilot?'Modello Copilot (auto oppure ID modello)':
+      const provider=providerWizard.draft.provider;
+      lines.push(fmt(provider==='copilot'?'Modello Copilot (auto oppure ID modello)':
+        provider==='codex-account'?'Modello Codex (ID opzionale; INVIO usa predefinito)':
         'Modello Ollama (nome esatto mostrato da ollama list)','bold'));
-      if(!copilot)lines.push(fmt('Endpoint: '+providerWizard.draft.baseUrl,'gray'));
+      if(provider==='ollama')lines.push(fmt('Endpoint: '+providerWizard.draft.baseUrl,'gray'));
       lines.push(fmt('> '+providerWizard.text,'cyan'));
+      if(provider==='codex-account')
+        lines.push(fmt('ID modello dalla Codex CLI; nessun elenco automatico.','gray'));
     }else if(providerWizard.step==='models'){
       lines.push(fmt(providerWizard.draft.provider==='copilot'?
         'Modelli disponibili tramite il tuo account Copilot':
@@ -1016,8 +1019,12 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         providerWizard={...providerWizard,step:'model',text:
           providerSelection.provider==='ollama'?providerSelection.model??'':'',
           draft:{provider:'ollama',baseUrl:LOCAL_OLLAMA_URL,model:''}};
-      }else if(command==='4'||command==='5'){
-        providerWizard={...providerWizard,draft:{provider:command==='4'?'codex-account':'claude-code-account',model:''}};
+      }else if(command==='4'){
+        providerWizard={...providerWizard,step:'model',
+          text:providerSelection.provider==='codex-account'?providerSelection.model??'':'',
+          draft:{provider:'codex-account',model:''}};
+      }else if(command==='5'){
+        providerWizard={...providerWizard,draft:{provider:'claude-code-account',model:''}};
         acceptProvider();
       }else if(command==='3'){
         providerWizard={...providerWizard,step:'url',
@@ -1042,7 +1049,8 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     if(command==='backspace'){
       providerWizard.text=providerWizard.text.slice(0,-1);return;
     }
-    if(command==='tab'&&providerWizard.step==='model'){
+    if(command==='tab'&&providerWizard.step==='model'&&
+      providerWizard.draft.provider!=='codex-account'){
       void discoverModels();return;
     }
     if(command==='enter'){

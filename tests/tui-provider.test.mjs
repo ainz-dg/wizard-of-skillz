@@ -231,3 +231,19 @@ test('Copilot model lookup failure preserves user-selected provider and never ge
     t.key('q');await session;
   }finally{cleanup(p);}
 });
+
+test('Codex selection allows default model or explicit ID, without a model request',async()=>{
+  const p=project(),t=terminal();let calls=0;
+  try{
+    const task=runReviewTui(p.folder,{consumerRoot:p.root,input:t.input,output:t.output,
+      providerFactory:()=>{calls++;return {};}});
+    t.key('l');t.key('4');
+    assert.match(t.output.text,/Modello Codex \(ID opzionale/);
+    t.key('return');
+    assert.match(t.output.text,/Codex CLI · modello predefinito/);
+    t.key('l');t.key('4');t.type('gpt-5.3-codex');t.key('return');
+    assert.match(t.output.text,/Codex CLI · gpt-5.3-codex/);
+    assert.equal(calls,0);
+    t.key('q');await task;
+  }finally{cleanup(p);}
+});

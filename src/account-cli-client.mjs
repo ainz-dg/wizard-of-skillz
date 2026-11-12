@@ -68,7 +68,8 @@ export class AccountCliClient {
       let text;
       if(this.provider==='codex-account'){
         const answer=path.join(cwd,'answer.txt');
-        const args=['exec','--sandbox','read-only','--ask-for-approval','never',
+        // Global approval flag precedes 'exec'; never grant write access.
+        const args=['--ask-for-approval','never','exec','--sandbox','read-only',
           '--skip-git-repo-check','--output-last-message',answer];
         if(this.model)args.push('--model',this.model);
         args.push('-');
