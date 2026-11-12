@@ -262,6 +262,8 @@ test('TAB Ollama discovery supports Esc cancellation without changing provider',
     t.key('escape');
     for(let i=0;i<20&&!cancelled;i++)await tick();
     assert.equal(cancelled,true);
+    for(let i=0;i<20&&!t.output.text.includes('Ricerca modelli annullata');i++)
+      await tick();
     assert.match(t.output.text,/Ricerca modelli annullata/);
     t.key('escape');
     assert.match(t.output.text,/Copilot · auto/);
