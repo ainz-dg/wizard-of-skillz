@@ -205,7 +205,7 @@ test('K followed by M stages manual-only semantic UPDATE; no source write withou
     await new Promise(resolve=>setImmediate(resolve));
   assert.match(output.text,/DIAGNOSI SEMANTICA/);
   key('escape'); // overview
-  key('down');key('return'); // highlight proposals then open inbox
+  key('down');key('down');key('return'); // skip rerun, open proposals
   assert.match(output.text,/DA PREPARARE|DA PREPAR\./);
   key('m');
   for(let n=0;n<80&&drafts===0;n++)

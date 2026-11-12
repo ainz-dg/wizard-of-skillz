@@ -363,7 +363,10 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
       for(const option of options)
         lines.push(fmt((option.id===active?.id?'  ❯ ':'    ')+option.title,
           option.id===active?.id?'cyan':'bold'));
-      if(active)lines.push('',fmt('  '+active.description,'gray'));
+      // Show all actions at 60×12, including rerun and project navigation.
+      const available=height-2-lines.length; // two lines reserved for keyboard hints
+      if(active&&available>=2)lines.push('',fmt('  '+active.description,'gray'));
+      else if(active&&available>=1)lines.push(fmt('  '+active.description,'gray'));
       return pinCommandHints(lines,commandHints(state.view,{
         narrow:true,providerPickerEnabled,modelConfigured,applyConfigured,
         proposalCount:items.length,hasSemanticReport:Boolean(semanticAudit)
@@ -376,7 +379,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
         '  ·  Proposte: '+items.length,'bold')
     );
     if(!compact)lines.push('');
-    lines.push(fmt('Scansione strutturale completata · verifica semantica non inclusa.','gray'));
+    lines.push(fmt('Scansione strutturale completata (offline, senza AI).','gray'));
     if(semanticAudit)
       lines.push(fmt('Audit LLM: '+semanticAudit.claims_checked+' claim, '+
         semanticAudit.proposed_updates+' ipotesi UPDATE · NON sono prove.','yellow'));
@@ -731,7 +734,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     }
     draw();
   };
-  const semanticMessage=async()=>{
+  const semanticMessage=async({fresh=false}={})=>{
     if(typeof clientFactory!=='function'&&typeof providerFactory!=='function'){
       state.notice='Audit semantico: seleziona un provider con L.';
       draw();return;
@@ -745,11 +748,21 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     draw();
     let client;
     try{
+      // An explicit rerun uses a new external review directory. In case of failure,
+      // the previous report, proposals and staged drafts stay intact and active.
+      const scan=fresh?createLocalScan(consumerRoot):null;
+      const target=scan?.output_directory??folder;
       client=typeof providerFactory==='function'?
         providerFactory({...providerSelection}):clientFactory();
-      const report=await performSemanticAudit(folder,{consumerRoot,client});
-      const previousSelected=state.selected.map(i=>catalog.items[i]?.id);
-      const previousDiscarded=state.discarded.map(i=>catalog.items[i]?.id);
+      const report=await performSemanticAudit(target,{consumerRoot,client});
+      const previousSelected=fresh?[]:state.selected.map(i=>catalog.items[i]?.id);
+      const previousDiscarded=fresh?[]:state.discarded.map(i=>catalog.items[i]?.id);
+      if(scan){
+        folder=target;
+        extra.localScan=scan;
+        extra.scopeHints=null;
+        extra.sourceChecks=null;
+      }
       proposals=load('repair-proposals.json',true);
       previews=loadReviewPreviews(folder,proposals,load('repair-previews.json'));
       catalog=buildReviewCatalog(proposals,{previews});
@@ -759,7 +772,8 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         .filter(i=>i>=0);
       state={...state,view:'semantic-list',semanticCursor:0,cursor:0,scroll:0,
         overviewChoice:null,selected:indexes(previousSelected),discarded:indexes(previousDiscarded),
-        notice:'Audit terminato: '+report.claims_checked+' claim esaminate, '+
+        notice:(scan?'Nuova sessione; analisi precedente conservata. ':'')+
+          'Audit terminato: '+report.claims_checked+' claim, '+
           report.proposed_updates+' ipotesi UPDATE. Nessuna scrittura nel progetto.'};
     }catch(error){state.notice='AUDIT SEMANTICO: '+error.message;}
     finally{
@@ -954,7 +968,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     providerWizard=null;
     state.overviewChoice=null; // Changing provider returns focus to the recommended action.
     state.notice='Provider scelto: '+providerDescription(providerSelection)+
-      '. Premi M su una UPDATE per chiedere una bozza.';
+      '. K analizza le skill, M prepara una bozza sulle UPDATE.';
   };
   const discoverModels=async()=>{
     if(providerWizard?.step!=='model'||typeof providerFactory!=='function')return;
@@ -1133,6 +1147,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       if(chosen?.id==='project'){openProject();draw();return;}
       if(chosen?.id==='domain'){beginDomain();draw();return;}
       if(chosen?.id==='audit'){void semanticMessage();return;}
+      if(chosen?.id==='rerun'){void semanticMessage({fresh:true});return;}
       if(chosen?.id==='results'){
         state={...state,view:'semantic-list',semanticCursor:0,scroll:0};
         draw();return;
@@ -1163,7 +1178,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       draw();return;
     }
     if(command==='k'&&!state.searching&&['overview','list'].includes(state.view)){
-      void semanticMessage();return;
+      void semanticMessage({fresh:Boolean(extra.semanticAudit)});return;
     }
     if(command==='j'&&!state.searching&&extra.semanticAudit&&
        ['overview','list'].includes(state.view)){

@@ -34,9 +34,13 @@ node bin/wizard.mjs
 All common workflows start in the same terminal UI:
 - **Scegli il progetto da analizzare:** switch to any local directory.
 - **Crea e verifica skill dalle risorse documentali:** source-first drafting with no existing skills required.
-- **Analizza le skill con l'AI:** technical skills semantic review.
+- **Analizza le skill con l'AI:** technical skills semantic review. Once an audit
+  exists, the overview offers **Nuova analisi AI (sessione separata)**: choose
+  another provider with **L** and select this action to keep the earlier audit
+  and drafts untouched in their previous external review directory.
 - **Esamina le proposte locali:** inspect and approve supported changes.
-- **Cambia modello:** choose an available provider for this session.
+- **Cambia modello:** choose a provider for the next audit without invoking it.
+  **K** analyzes skills; **M** prepares a revision draft for a selected UPDATE.
 
 Commands such as `scan`, `domain` and `doctor` remain available for scripts and
 advanced users; they are not the required onboarding path. Model invocations

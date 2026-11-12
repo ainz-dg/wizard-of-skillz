@@ -35,7 +35,8 @@ test('pure menu picks next valid action as audit becomes available or report exi
   assert.equal(moveOverviewChoice(a,'audit',-1),'audit');
   const report=overviewActions({hasSemanticReport:true,modelConfigured:true,
     providerPickerEnabled:true,proposalCount:1});
-  assert.deepEqual(report.map(x=>x.id),['results','proposals','provider']);
+  assert.deepEqual(report.map(x=>x.id),['results','rerun','proposals','provider']);
+  assert.match(report[1].title,/Nuova analisi AI/);
   assert.equal(activeOverviewChoice(report,'audit').id,'results');
   assert.deepEqual(overviewActions({modelConfigured:false,proposalCount:2})
     .map(x=>x.id),['proposals']);
@@ -221,4 +222,50 @@ test('60x12 preview exposes its final line within 24 down keys without Apply',()
   assert.equal(frame.split('\n').length,12);
   assert.match(frame,/PREVIEW-END-12/,'Final candidate line should be visible after 24 down keys');
   assert.match(frame,/G → Y/,'Human confirmation remains separate');
+});
+
+test('a second AI audit with a different model preserves the previous report',async t=>{
+  const x=env(t),calls=[],configured=[];
+  const session=runReviewTui(x.audit,{consumerRoot:fixture,input:x.input,output:x.output,
+    providerFactory:selection=>{
+      configured.push(selection.provider);
+      return {provider:selection.provider,model:selection.model,
+        async completeJson(){
+          calls.push(selection.provider);
+          return {verdict:'INSUFFICIENT_EVIDENCE',reason:'Simulated',citation:null};
+        }};
+    }});
+  try{
+    x.key('return');
+    for(let i=0;i<80&&!x.screen().includes('DIAGNOSI SEMANTICA');i++)await tick();
+    assert.equal(calls.length,2);
+    const original=fs.readFileSync(path.join(x.audit,'semantic-audit.json'),'utf8');
+    assert.equal(JSON.parse(original).provider,'copilot');
+    x.key('escape');
+    assert.match(x.screen(),/Nuova analisi AI/);
+    x.key('l');x.key('4'); // choose Codex CLI; changing provider does not call it
+    assert.equal(calls.length,2);
+    assert.match(x.screen(),/K analizza le skill/);
+    x.key('down');x.key('return'); // new independent analysis session
+    for(let i=0;i<80&&calls.length<4;i++)await tick();
+    for(let i=0;i<80&&!x.screen().includes('DIAGNOSI SEMANTICA');i++)await tick();
+    assert.deepEqual(configured,['copilot','codex-account']);
+    assert.deepEqual(calls,['copilot','copilot','codex-account','codex-account']);
+    assert.equal(fs.readFileSync(path.join(x.audit,'semantic-audit.json'),'utf8'),original);
+    assert.equal(fs.existsSync(path.join(x.audit,'apply-result.json')),false);
+  }finally{x.key('q');await session;}
+});
+
+test('60x12 with an existing AI report keeps all menu options visible',()=>{
+  const catalog=buildReviewCatalog({consumer_repo:'local/example',proposals:[]});
+  const screen=renderReviewTui(catalog,initialTuiState({guided:true}),{
+    columns:60,rows:12,colors:false,canChooseProject:true,canUseDomain:true,
+    projectRoot:'/tmp/example',modelConfigured:true,providerPickerEnabled:true,
+    providerSelection:{provider:'copilot',model:'auto'},
+    localScan:{skill_count:2},semanticAudit:{claims_checked:2,proposed_updates:0}
+  });
+  assert.equal(screen.split('\n').length,12);
+  assert.match(screen,/Esamina i risultati/);
+  assert.match(screen,/Nuova analisi AI/);
+  assert.match(screen,/Scegli il progetto da analizzare/);
 });
