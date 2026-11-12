@@ -1,6 +1,6 @@
 # Contributing
 
-Wizard is currently private. Public contributions are not yet open. Source code is licensed under [Apache License 2.0](LICENSE); attribution and changes must follow its terms.
+Wizard is a public open-source project with experimental prereleases. Proposals and pull requests are subject to maintainer review; nothing is merged or published automatically. Source code is licensed under [Apache License 2.0](LICENSE); attribution and changes must follow its terms.
 
 Keep its core generic, simple and provider-agnostic. Do not copy proprietary assets or application-specific code and fixtures. Use small synthetic tests for each change. Run `npm ci`, `npm test`, `npm run pack:check`. For any write-path change, test stale hashes, path escapes, symlinks and rollback.
 

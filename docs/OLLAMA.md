@@ -1,5 +1,7 @@
 # Using Ollama with Wizard of Skillz
 
+The examples below use the `wizard` executable; obtain it with `npm install --global wizard-of-skillz@next`, or replace `wizard` with `npx --yes wizard-of-skillz@next` for one-off use.
+
 Wizard supports `copilot` (default), `ollama` (optional), and
 `openai-compatible` (custom endpoint). Ollama is **not a dependency**:
 the provider reuses Wizard's existing JSON-only OpenAI-compatible transport.

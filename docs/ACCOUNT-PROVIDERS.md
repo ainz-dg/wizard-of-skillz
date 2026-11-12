@@ -9,15 +9,17 @@ These are independent of Wizard's OpenAI-compatible API-key provider:
 
 ## Check your own local installation
 
+The examples below invoke the published npm release with `npx`. Run them on a trusted machine where the official provider CLI is already installed and signed in.
+
     codex login
-    node bin/wizard.mjs doctor --llm-provider codex-account
-    node bin/wizard.mjs probe --llm-provider codex-account
+    npx --yes wizard-of-skillz@next doctor --llm-provider codex-account
+    npx --yes wizard-of-skillz@next probe --llm-provider codex-account
 
 For Claude Code:
 
     claude auth login
-    node bin/wizard.mjs doctor --llm-provider claude-code-account
-    node bin/wizard.mjs probe --llm-provider claude-code-account
+    npx --yes wizard-of-skillz@next doctor --llm-provider claude-code-account
+    npx --yes wizard-of-skillz@next probe --llm-provider claude-code-account
 
 Codex runs exec in an isolated temporary working directory with a read-only
 sandbox and no repository checkout. Codex retains its built-in read-only tools;
