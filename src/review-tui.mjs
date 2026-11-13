@@ -247,11 +247,14 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
         fmt('> '+providerWizard.text,'cyan'),
         '');
     }else if(providerWizard.step==='model'){
-      const copilot=providerWizard.draft.provider==='copilot';
-      lines.push(fmt(copilot?'Modello Copilot (auto oppure ID modello)':
+      const provider=providerWizard.draft.provider;
+      lines.push(fmt(provider==='copilot'?'Modello Copilot (auto oppure ID modello)':
+        provider==='codex-account'?'Modello Codex (ID opzionale; INVIO usa predefinito)':
         'Modello Ollama (nome esatto mostrato da ollama list)','bold'));
-      if(!copilot)lines.push(fmt('Endpoint: '+providerWizard.draft.baseUrl,'gray'));
+      if(provider==='ollama')lines.push(fmt('Endpoint: '+providerWizard.draft.baseUrl,'gray'));
       lines.push(fmt('> '+providerWizard.text,'cyan'));
+      if(provider==='codex-account')
+        lines.push(fmt('ID modello dalla Codex CLI; nessun elenco automatico.','gray'));
     }else if(providerWizard.step==='models'){
       lines.push(fmt(providerWizard.draft.provider==='copilot'?
         'Modelli disponibili tramite il tuo account Copilot':
@@ -266,7 +269,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
 
     }
     return pinCommandHints(lines,commandHints(state.view,{
-      wizardStep:providerWizard.step
+      wizardStep:providerWizard.step,wizardProvider:providerWizard.draft?.provider
     }),{height,width,fmt});
   }
   if(projectWizard){
@@ -357,13 +360,19 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
     const compact=height<20;
     // At 12 rows, reserve the footer and keep all menu choices visible.
     if(height<=12){
-      lines.push(fmt((localScan?localScan.skill_count+' skill individuate':
-        'Proposte strutturali: '+items.length)+' · Proposte: '+items.length,'bold'),
-        fmt('COSA VUOI FARE?   ↑↓ e INVIO','cyan'));
+      // A 60×12 viewport has room for all six actions only if we omit the
+      // optional count line; three footer rows remain reserved.
+      if(options.length<=5)lines.push(fmt((localScan?
+        localScan.skill_count+' skill individuate':'Proposte strutturali: '+items.length)+
+        ' · Proposte: '+items.length,'bold'));
+      lines.push(fmt('COSA VUOI FARE?   ↑↓ e INVIO','cyan'));
       for(const option of options)
         lines.push(fmt((option.id===active?.id?'  ❯ ':'    ')+option.title,
           option.id===active?.id?'cyan':'bold'));
-      if(active)lines.push('',fmt('  '+active.description,'gray'));
+      // Show all actions at 60×12, including rerun and project navigation.
+      const available=height-3-lines.length; // separator + two keyboard hint rows
+      if(active&&available>=2)lines.push('',fmt('  '+active.description,'gray'));
+      else if(active&&available>=1)lines.push(fmt('  '+active.description,'gray'));
       return pinCommandHints(lines,commandHints(state.view,{
         narrow:true,providerPickerEnabled,modelConfigured,applyConfigured,
         proposalCount:items.length,hasSemanticReport:Boolean(semanticAudit)
@@ -376,12 +385,12 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
         '  ·  Proposte: '+items.length,'bold')
     );
     if(!compact)lines.push('');
-    lines.push(fmt('Scansione strutturale completata · verifica semantica non inclusa.','gray'));
+    lines.push(fmt('Scansione strutturale completata (offline, senza AI).','gray'));
     if(semanticAudit)
       lines.push(fmt('Audit LLM: '+semanticAudit.claims_checked+' claim, '+
         semanticAudit.proposed_updates+' ipotesi UPDATE · NON sono prove.','yellow'));
     else
-      lines.push(fmt('Audit semantico: non ancora eseguito.','yellow'));
+      lines.push(fmt('Audit semantico: non ancora eseguito (facoltativo: K).','yellow'));
     if(!compact)lines.push('');
     lines.push(fmt('COSA VUOI FARE?   ↑↓ e INVIO','cyan'));
     for(const option of options)
@@ -665,6 +674,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     projectRoot:consumerRoot,canChooseProject:true,canUseDomain:Boolean(consumerRoot)
   }));
   let busy=false;
+  let activeController=null;
   const draftIds=()=>{
     if(state.view!=='list'||state.searching||!consumerRoot)
       throw Error('Apri la lista con un progetto esplicito per preparare la patch');
@@ -731,7 +741,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     }
     draw();
   };
-  const semanticMessage=async()=>{
+  const semanticMessage=async({fresh=false}={})=>{
     if(typeof clientFactory!=='function'&&typeof providerFactory!=='function'){
       state.notice='Audit semantico: seleziona un provider con L.';
       draw();return;
@@ -740,16 +750,34 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       try{validateProviderSelection(providerSelection);}
       catch(error){state.notice='LLM: '+error.message+' (L per configurare).';draw();return;}
     }
+    const controller=new AbortController();
+    activeController=controller;
     busy=true;
-    state.notice='Audit semantico richiesto: skill e frammenti di codice saranno inviati al modello.';
+    state.notice='Analisi AI facoltativa: '+providerDescription(providerSelection)+
+      ' · ESC annulla';
     draw();
     let client;
     try{
+      // An explicit rerun uses a new external review directory. In case of failure,
+      // the previous report, proposals and staged drafts stay intact and active.
+      const scan=fresh?createLocalScan(consumerRoot):null;
+      const target=scan?.output_directory??folder;
       client=typeof providerFactory==='function'?
         providerFactory({...providerSelection}):clientFactory();
-      const report=await performSemanticAudit(folder,{consumerRoot,client});
-      const previousSelected=state.selected.map(i=>catalog.items[i]?.id);
-      const previousDiscarded=state.discarded.map(i=>catalog.items[i]?.id);
+      const report=await performSemanticAudit(target,{consumerRoot,client,
+        signal:controller.signal,onProgress:({claim,total})=>{
+          state.notice='Analisi AI '+claim+'/'+total+' · '+providerDescription(providerSelection)+
+            ' · ESC annulla';
+          draw();
+        }});
+      const previousSelected=fresh?[]:state.selected.map(i=>catalog.items[i]?.id);
+      const previousDiscarded=fresh?[]:state.discarded.map(i=>catalog.items[i]?.id);
+      if(scan){
+        folder=target;
+        extra.localScan=scan;
+        extra.scopeHints=null;
+        extra.sourceChecks=null;
+      }
       proposals=load('repair-proposals.json',true);
       previews=loadReviewPreviews(folder,proposals,load('repair-previews.json'));
       catalog=buildReviewCatalog(proposals,{previews});
@@ -759,10 +787,15 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         .filter(i=>i>=0);
       state={...state,view:'semantic-list',semanticCursor:0,cursor:0,scroll:0,
         overviewChoice:null,selected:indexes(previousSelected),discarded:indexes(previousDiscarded),
-        notice:'Audit terminato: '+report.claims_checked+' claim esaminate, '+
+        notice:(scan?'Nuova sessione; analisi precedente conservata. ':'')+
+          'Audit terminato: '+report.claims_checked+' claim, '+
           report.proposed_updates+' ipotesi UPDATE. Nessuna scrittura nel progetto.'};
-    }catch(error){state.notice='AUDIT SEMANTICO: '+error.message;}
-    finally{
+    }catch(error){
+      state.notice=controller.signal.aborted?
+        'Analisi AI annullata. Risultati precedenti invariati.':
+        'AUDIT SEMANTICO: '+error.message;
+    }finally{
+      activeController=null;
       try{await closeLlmClient(client);}catch(error){state.notice+=' · '+error.message;}
       busy=false;draw();
     }
@@ -954,11 +987,15 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     providerWizard=null;
     state.overviewChoice=null; // Changing provider returns focus to the recommended action.
     state.notice='Provider scelto: '+providerDescription(providerSelection)+
-      '. Premi M su una UPDATE per chiedere una bozza.';
+      '. K analizza le skill, M prepara una bozza sulle UPDATE.';
   };
   const discoverModels=async()=>{
     if(providerWizard?.step!=='model'||typeof providerFactory!=='function')return;
+    const controller=new AbortController();
+    activeController=controller;
     busy=true;
+    state.notice='Lettura modelli in corso... ESC annulla; Ollama max 15s.';
+    draw();
     let client;
     try{
       const draft={...providerWizard.draft,model:''};
@@ -966,7 +1003,9 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       client=providerFactory(draft);
       if(typeof client?.doctor!=='function')
         throw Error('Il provider non supporta l’elenco modelli');
-      const info=await client.doctor();
+      const info=await client.doctor(draft.provider==='ollama'?
+        {signal:controller.signal,timeoutMs:15000}:{});
+      if(controller.signal.aborted)throw Error('Ricerca modelli annullata');
       const models=(info.models??[]).map(m=>m?.id??m?.model??m?.name).filter(Boolean);
       if(draft.provider==='copilot')models.unshift('auto');
       if(!models.length)throw Error('Nessun modello disponibile sul server Ollama.');
@@ -974,8 +1013,11 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       providerWizard={...providerWizard,step:'models',models:unique,
         modelCursor:Math.max(0,unique.indexOf(providerWizard.text))};
       state.notice='Scegli un modello. Nessuna generazione effettuata.';
-    }catch(error){state.notice='Elenco modelli: '+error.message;}
-    finally{
+    }catch(error){
+      state.notice=controller.signal.aborted?'Ricerca modelli annullata.':
+        'Elenco modelli: '+error.message;
+    }finally{
+      activeController=null;
       try{await closeLlmClient(client);}catch{}
       busy=false;draw();
     }
@@ -999,8 +1041,12 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         providerWizard={...providerWizard,step:'model',text:
           providerSelection.provider==='ollama'?providerSelection.model??'':'',
           draft:{provider:'ollama',baseUrl:LOCAL_OLLAMA_URL,model:''}};
-      }else if(command==='4'||command==='5'){
-        providerWizard={...providerWizard,draft:{provider:command==='4'?'codex-account':'claude-code-account',model:''}};
+      }else if(command==='4'){
+        providerWizard={...providerWizard,step:'model',
+          text:providerSelection.provider==='codex-account'?providerSelection.model??'':'',
+          draft:{provider:'codex-account',model:''}};
+      }else if(command==='5'){
+        providerWizard={...providerWizard,draft:{provider:'claude-code-account',model:''}};
         acceptProvider();
       }else if(command==='3'){
         providerWizard={...providerWizard,step:'url',
@@ -1025,7 +1071,8 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     if(command==='backspace'){
       providerWizard.text=providerWizard.text.slice(0,-1);return;
     }
-    if(command==='tab'&&providerWizard.step==='model'){
+    if(command==='tab'&&providerWizard.step==='model'&&
+      providerWizard.draft.provider!=='codex-account'){
       void discoverModels();return;
     }
     if(command==='enter'){
@@ -1082,7 +1129,14 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
   const handler=(ch,key={})=>{
     const command=key.name==='return'?'enter':key.name==='space'?'space':
       key.name==='escape'?'escape':key.name || ch;
-    if(busy)return;
+    if(busy){
+      if(activeController && (command==='escape'||(key.ctrl&&command==='c'))){
+        activeController.abort();
+        state.notice='Annullamento richiesto; attendo la richiesta in corso...';
+        draw();
+      }
+      return;
+    }
     if(key.ctrl&&command==='c'){finish();return;}
     if(providerWizard){
       try{providerKey(ch,command);}catch(error){state.notice='LLM: '+error.message;}
@@ -1133,6 +1187,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       if(chosen?.id==='project'){openProject();draw();return;}
       if(chosen?.id==='domain'){beginDomain();draw();return;}
       if(chosen?.id==='audit'){void semanticMessage();return;}
+      if(chosen?.id==='rerun'){void semanticMessage({fresh:true});return;}
       if(chosen?.id==='results'){
         state={...state,view:'semantic-list',semanticCursor:0,scroll:0};
         draw();return;
@@ -1163,7 +1218,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       draw();return;
     }
     if(command==='k'&&!state.searching&&['overview','list'].includes(state.view)){
-      void semanticMessage();return;
+      void semanticMessage({fresh:Boolean(extra.semanticAudit)});return;
     }
     if(command==='j'&&!state.searching&&extra.semanticAudit&&
        ['overview','list'].includes(state.view)){

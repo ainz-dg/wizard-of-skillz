@@ -59,7 +59,7 @@ test('local intake creates source-backed MANUAL_ONLY reviews outside project wit
     const view=renderReviewTui(catalog,initialTuiState({guided:true}),{
       localScan:result,columns:92,rows:20,colors:false});
     assert.match(view,/1 skill individuate/);
-    assert.match(view,/verifica semantica non inclusa/);
+    assert.match(view,/Scansione strutturale completata \(offline, senza AI\)/);
     assert.match(view,/Audit semantico: non ancora eseguito/);
   }finally{fs.rmSync(sandbox,{recursive:true,force:true});}
 });

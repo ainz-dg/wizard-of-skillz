@@ -34,13 +34,27 @@ node bin/wizard.mjs
 All common workflows start in the same terminal UI:
 - **Scegli il progetto da analizzare:** switch to any local directory.
 - **Crea e verifica skill dalle risorse documentali:** source-first drafting with no existing skills required.
-- **Analizza le skill con l'AI:** technical skills semantic review.
+- **Analizza le skill con l'AI:** technical skills semantic review. Once an audit
+  exists, the overview offers **Nuova analisi AI (sessione separata)**: choose
+  another provider with **L** and select this action to keep the earlier audit
+  and drafts untouched in their previous external review directory.
 - **Esamina le proposte locali:** inspect and approve supported changes.
-- **Cambia modello:** choose an available provider for this session.
+- **Cambia modello:** choose a provider for the next audit without invoking it.
+  **K** analyzes skills; **M** prepares a revision draft for a selected UPDATE.
 
 Commands such as `scan`, `domain` and `doctor` remain available for scripts and
 advanced users; they are not the required onboarding path. Model invocations
 and writes always require their separate explicit approvals.
+
+**The AI semantic audit is optional and disabled at startup.** The initial
+structural scan is entirely local; it does not call an AI provider. There is
+no persistent AI on/off switch: use **L** to select a provider and **K** to
+run an audit only when you want it. After the first audit its report remains
+visible; selecting the same project again starts a fresh structural-only
+session. During an audit you can see claim progress and press **Esc** to
+request cancellation. HTTP-based requests (such as Ollama) can be aborted;
+other providers may need to finish the current request before cancellation
+takes effect. An incomplete audit does not publish partial findings.
 
 ## Navigation
 Use **↑/↓** and **Enter** for the guided overview; **Esc** to return. **L** selects the LLM provider, **K** explicitly requests semantic triage, and **J** displays its evidence report. **M** requests a draft for an eligible UPDATE; **E** opens local editing; **P** displays the prepared preview; **R** prepares supported lifecycle operations. **Space** selects a prepared item. The separate **G**, then **Y** confirmation is required before applying a reviewed write.

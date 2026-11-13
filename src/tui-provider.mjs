@@ -13,7 +13,8 @@ export function initialProviderSelection(options={}){
 export function providerDescription(config){
   if(!config)return 'non configurato';
   if(config.provider==='copilot')return 'Copilot · '+(config.model||'auto');
-  if(config.provider==='codex-account')return 'OpenAI via Codex CLI · account locale';
+  if(config.provider==='codex-account')return 'OpenAI via Codex CLI · '+
+    (config.model||'modello predefinito');
   if(config.provider==='claude-code-account')return 'Anthropic via Claude Code CLI · account locale';
   if(config.provider==='ollama'){
     const url=config.baseUrl||LOCAL_OLLAMA_URL;

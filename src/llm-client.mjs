@@ -49,8 +49,11 @@ export class OpenAICompatibleClient {
     return `${this.baseUrl}/chat/completions`;
   }
 
-  async completeJson({ system, user }) {
+  async completeJson({ system, user, signal = null }) {
     const controller = new AbortController();
+    const cancel=()=>controller.abort();
+    signal?.addEventListener('abort',cancel,{once:true});
+    if(signal?.aborted)cancel();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     const headers = { 'content-type': 'application/json' };
     if (this.apiKey) headers.authorization = `Bearer ${this.apiKey}`;
@@ -78,8 +81,14 @@ export class OpenAICompatibleClient {
       const content = payload?.choices?.[0]?.message?.content;
       if (typeof content !== 'string') throw new Error('LLM envelope missing choices[0].message.content');
       return parseJsonContent(content);
+    } catch(error) {
+      if(signal?.aborted)throw new Error('LLM request cancelled');
+      if(controller.signal.aborted)
+        throw new Error('LLM request timed out after '+this.timeoutMs+'ms: '+this.endpoint());
+      throw error;
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener('abort',cancel);
     }
   }
 }

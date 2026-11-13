@@ -5,13 +5,15 @@
 export function commandHints(view,{
   narrow=false,searching=false,modelConfigured=false,providerPickerEnabled=false,
   editorConfigured=false,hasSemanticReport=false,applyConfigured=false,
-  proposalCount=0,twoPane=false,wizardStep=null
+  proposalCount=0,twoPane=false,wizardStep=null,wizardProvider=null
 }={}){
   if(wizardStep==='menu')
     return ['1 Copilot  2 Ollama locale  3 Ollama remoto  4 Codex  5 Claude',
       'ESC Annulla scelta'];
   if(wizardStep==='model')
-    return ['INVIO Conferma modello  TAB Elenca modelli','ESC Annulla scelta'];
+    return wizardProvider==='codex-account'?
+      ['INVIO ID oppure predefinito  TAB non disponibile','ESC Annulla scelta']:
+      ['INVIO Conferma modello  TAB Elenca modelli','ESC Annulla scelta'];
   if(wizardStep==='models')
     return ['↑↓ Naviga  INVIO Scegli modello  T Digita nome','ESC Torna'];
   if(wizardStep==='url')
@@ -24,7 +26,7 @@ export function commandHints(view,{
       'D Dominio  L Modello  K Audit  Q Esci'
     ]:[
       '↑↓ Scegli un’azione  INVIO Seleziona'+
-        (hasSemanticReport?'  J Risultati':modelConfigured?'  K Audit':'')+
+        (hasSemanticReport?'  J Risultati  K Nuova analisi':modelConfigured?'  K Audit':'')+
         (providerPickerEnabled?'  L Provider':''),
       'D Dominio  ? Aiuto  Q Esci  ·  Solo G → Y applica'
     ];
@@ -80,9 +82,9 @@ export function commandHints(view,{
 export const HELP_LINES=[
   'COME FUNZIONA',
   '1. SCANSIONE: il comando wizard scan controlla struttura e link senza modelli.',
-  '2. ANALISI: L sceglie il provider AI; K invia le claim e gli snippet al modello.',
+  '2. ANALISI FACOLTATIVA: L sceglie il modello; K invia claim e snippet.',
   '   Dal menu: scegli il progetto e le risorse, M prepara una richiesta, Y autorizza invio AI.',
-  '3. VERIFICA: J apre gli esiti; una citazione valida non dimostra un errore.',
+  '3. VERIFICA: J mostra gli esiti; K ripete con una nuova sessione. ESC annulla.',
   '4. PROPOSTA DI MODIFICA: M chiede all’AI un SKILL.md completo rivisto (solo UPDATE).',
   '   E permette una modifica con editor; P mostra il diff. Nessuna scrittura nel progetto.',
   '5. REVISIONE E DECISIONE: leggi tutto il diff, SPAZIO seleziona, G verifica il lotto;',
@@ -99,9 +101,9 @@ export function contextualHelp(view){
   switch(view){
     case 'overview':
       return [
-        'QUI: ↑↓ sceglie fra analizzare, esaminare le proposte e cambiare modello.',
+        'QUI: puoi leggere gli esiti, rifare l’analisi e valutare le proposte.',
         'Dal menu puoi anche scegliere il progetto e lavorare sulle risorse documentali.',
-        'INVIO attiva l’azione evidenziata; K, J e L restano scorciatoie.',
+        'Scansione offline automatica; K avvia l’analisi AI facoltativa.',
         'Le risorse documentali aprono una guida con fonti, consenso e bozze da approvare.',
         'Non serve ricordare i tasti per utilizzare il Mago.'
       ];

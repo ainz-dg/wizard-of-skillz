@@ -11,8 +11,12 @@ export function overviewActions({hasSemanticReport=false,modelConfigured=false,
       id:'results',title:'Esamina i risultati dell’analisi',
       description:'Leggi le ipotesi del modello e le citazioni verificabili.'
     });
-  }else if(modelConfigured){
-    actions.push({
+  }
+  if(modelConfigured){
+    actions.push(hasSemanticReport?{
+      id:'rerun',title:'Nuova analisi AI (sessione separata)',
+      description:'Usa '+modelLabel+' in una nuova sessione; conserva gli esiti precedenti.'
+    }:{
       id:'audit',title:'Analizza le skill con l’AI',
       description:'Invia le istruzioni e frammenti di codice al modello: '+modelLabel+'.'
     });
@@ -25,7 +29,7 @@ export function overviewActions({hasSemanticReport=false,modelConfigured=false,
   });
   if(providerPickerEnabled)actions.push({
     id:'provider',title:'Cambia modello',
-    description:'Seleziona Copilot, Ollama, Codex o Claude Code per questa sessione.'
+    description:'Seleziona il modello per la prossima analisi. L non chiama il modello.'
   });
   if(canUseDomain)actions.push({
     id:'domain',title:'Crea e verifica skill dalle risorse documentali',

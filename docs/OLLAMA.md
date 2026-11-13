@@ -37,8 +37,13 @@ Start `wizard` or `wizard scan .`, press **L** and select **2**
 for local Ollama or **3** for a remote server. For remote, enter
 `http(s)://host:port/v1`; then choose a model by typing its name
 or pressing **TAB** to list models from that server. The active
-provider/model appears in the status line. Only **M** on an UPDATE
-sends a generation request; **G → Y** is still separate approval
+provider/model appears in the status line. **K** starts an optional semantic
+audit; **M** on a selected UPDATE prepares a proposed new skill. During the
+audit, the TUI shows progress (claim X/Y) and **Esc** cancels the in-flight
+Ollama request. Individual requests have a bounded timeout with a clear error.
+Model discovery with **TAB** has a separate 15-second timeout and can also
+be cancelled with **Esc**.
+**G → Y** is still separate approval
 for applying any source change.
 
 No provider call occurs on startup or merely choosing the provider.
@@ -71,7 +76,8 @@ wizard prepare-update /path/to/audit --consumer-root /path/to/project \
 
 The same provider choice works for Wizard's other `--llm` workflows.
 Calling `scan` alone is offline and never starts the LLM.
-Pressing **L** selects a provider, and **M** is the explicit generation request.
+Pressing **L** only selects a provider. **K** starts optional semantic triage;
+**M** explicitly requests a draft only for a selected UPDATE.
 Generated content is untrusted and **never authorizes Apply**.
 
 ## Ollama on another machine

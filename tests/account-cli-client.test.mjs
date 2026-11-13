@@ -10,8 +10,9 @@ test('Codex account provider uses unmodified CLI with read-only sandbox and temp
   const run=async(binary,args,{input,cwd})=>{
     assert.equal(binary,'codex');assert.ok(args.includes('read-only'));
     assert.ok(args.includes('--skip-git-repo-check'));
-    assert.ok(args.includes('--ask-for-approval'));
-    assert.ok(args.includes('never'));
+    assert.deepEqual(args.slice(0,3),['--ask-for-approval','never','exec']);
+    assert.equal(args[args.indexOf('--sandbox')+1],'read-only');
+    assert.ok(!args.includes('--dangerously-bypass-approvals-and-sandbox'));
     assert.equal(args.at(-1),'-');
     assert.match(input,/Return machine-readable JSON only/);
     temp=cwd;
@@ -45,7 +46,8 @@ test('factory and TUI accept optional account providers without a model or API k
     assert.equal(c.provider,provider);
     assert.equal(c.auth,'local-cli-user-account');
     assert.equal(validateProviderSelection({provider,model:''}).provider,provider);
-    assert.match(providerDescription({provider}),/account locale/);
+    assert.match(providerDescription({provider}),
+      provider==='codex-account'?/modello predefinito/:/account locale/);
   }
 });
 test('doctor only inspects existing CLI authentication status',async()=>{
@@ -57,4 +59,18 @@ test('doctor only inspects existing CLI authentication status',async()=>{
   assert.deepEqual(seen,{binary:'claude',args:['auth','status']});
   assert.equal(result.ok,true);
   assert.equal(result.auth,'local-cli-user-account');
+});
+
+test('Codex passes chosen model without elevating permissions',async()=>{
+  let recorded;
+  const c=new AccountCliClient({provider:'codex-account',model:'gpt-5.3-codex',
+    run:async(_bin,args)=>{
+      recorded=args;
+      fs.writeFileSync(args[args.indexOf('--output-last-message')+1],'{"ok":true}');
+      return {stdout:'',stderr:''};
+    }});
+  assert.deepEqual(await c.completeJson({system:'a',user:'b'}),{ok:true});
+  assert.deepEqual(recorded.slice(0,3),['--ask-for-approval','never','exec']);
+  assert.equal(recorded[recorded.indexOf('--model')+1],'gpt-5.3-codex');
+  assert.equal(recorded[recorded.indexOf('--sandbox')+1],'read-only');
 });

@@ -45,15 +45,18 @@ export class OllamaClient {
     this.apiKey=apiKey;
   }
 
-  async completeJson({system,user}){
+  async completeJson({system,user,signal=null}){
     if(!this.transport)
       throw Error('Ollama requires --llm-model <name> (or WIZARD_LLM_MODEL). Run wizard doctor --llm-provider ollama to list installed models.');
-    return this.transport.completeJson({system,user});
+    return this.transport.completeJson({system,user,signal});
   }
 
-  async doctor(){
+  async doctor({signal=null,timeoutMs=this.timeoutMs}={}){
     const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),this.timeoutMs);
+    const cancel=()=>controller.abort();
+    signal?.addEventListener('abort',cancel,{once:true});
+    if(signal?.aborted)cancel();
+    const timer=setTimeout(()=>controller.abort(),timeoutMs);
     let response;
     try{
       response=await this.fetchImpl(this.tagsUrl,{
@@ -76,7 +79,11 @@ export class OllamaClient {
     }catch(error){
       throw Error('Cannot query Ollama models at '+this.tagsUrl+
         '. Check that Ollama is running and --llm-url is correct. ('+
-        (controller.signal.aborted?'request timed out':error.message)+')');
-    }finally{clearTimeout(timer);}
+        (signal?.aborted?'request cancelled':
+          controller.signal.aborted?'request timed out':error.message)+')');
+    }finally{
+      clearTimeout(timer);
+      signal?.removeEventListener('abort',cancel);
+    }
   }
 }

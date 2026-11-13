@@ -27,3 +27,21 @@ test('OpenAI-compatible client calls chat/completions and parses JSON content', 
   assert.equal(seen.body.model,'test-model');
   assert.equal(seen.body.messages[1].content,'u');
 });
+
+test('OpenAI-compatible request can be aborted and emits a useful timeout',async()=>{
+  const fetchImpl=(_url,{signal})=>new Promise((_resolve,reject)=>{
+    if(signal.aborted)return reject(Error('aborted'));
+    signal.addEventListener('abort',()=>reject(Error('aborted')),{once:true});
+  });
+  const controller=new AbortController();
+  const client=new OpenAICompatibleClient({
+    baseUrl:'http://127.0.0.1:11434/v1',model:'mock',fetchImpl,timeoutMs:300
+  });
+  const pending=client.completeJson({system:'s',user:'u',signal:controller.signal});
+  controller.abort();
+  await assert.rejects(pending,/LLM request cancelled/);
+  const timed=new OpenAICompatibleClient({
+    baseUrl:'http://127.0.0.1:11434/v1',model:'mock',fetchImpl,timeoutMs:15
+  });
+  await assert.rejects(timed.completeJson({system:'s',user:'u'}),/LLM request timed out after 15ms/);
+});

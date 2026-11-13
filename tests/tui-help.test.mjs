@@ -197,7 +197,7 @@ test('after semantic triage, next action becomes J, with visible hypothesis coun
 test('help is contextual rather than dumping every command in the initial overview',()=>{
   const screen=render('help',{rows:35,state:{helpReturnView:'overview'}});
   assert.match(screen,/IN QUESTA SCHERMATA/);
-  assert.match(screen,/QUI: ↑↓ sceglie fra analizzare/);
+  assert.match(screen,/QUI: puoi leggere gli esiti, rifare l’analisi/);
   assert.match(screen,/SCORCIATOIE AVANZATE/);
   assert.ok(!screen.includes('ALTRE AZIONI: B scarta visibili'));
   const list=render('help',{rows:35,state:{helpReturnView:'list'}});
@@ -212,4 +212,10 @@ test('offline review without client does not advertise an unavailable semantic m
   assert.match(screen,/Esamina le proposte locali/);
   assert.doesNotMatch(screen,/Analizza le skill con l’AI/);
   assert.match(screen,/↑↓ Scegli/);
+});
+
+test('Codex picker does not advertise a model catalog',()=>{
+  const footer=commandHints('overview',{wizardStep:'model',wizardProvider:'codex-account'});
+  assert.match(footer[0],/predefinito/);
+  assert.doesNotMatch(footer[0],/TAB Elenca modelli/);
 });

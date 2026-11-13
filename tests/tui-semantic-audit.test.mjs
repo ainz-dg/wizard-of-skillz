@@ -205,7 +205,7 @@ test('K followed by M stages manual-only semantic UPDATE; no source write withou
     await new Promise(resolve=>setImmediate(resolve));
   assert.match(output.text,/DIAGNOSI SEMANTICA/);
   key('escape'); // overview
-  key('down');key('return'); // highlight proposals then open inbox
+  key('down');key('down');key('return'); // skip rerun, open proposals
   assert.match(output.text,/DA PREPARARE|DA PREPAR\./);
   key('m');
   for(let n=0;n<80&&drafts===0;n++)
@@ -217,4 +217,24 @@ test('K followed by M stages manual-only semantic UPDATE; no source write withou
   assert.equal(fs.readFileSync(skill,'utf8'),before);
   key('q');await session;
   assert.equal(fs.readFileSync(skill,'utf8'),before);
+});
+
+test('progress and cancel prevent partial semantic audit results',async t=>{
+  const fixture=ROOTS[0],audit=setup(t,fixture);
+  const original=fs.readFileSync(path.join(audit,'repair-proposals.json'));
+  const controller=new AbortController(),events=[];
+  let calls=0;
+  const model={provider:'synthetic',model:'slow',async completeJson(){
+    calls++;
+    controller.abort();
+    return {verdict:'INSUFFICIENT_EVIDENCE',citation:null};
+  }};
+  await assert.rejects(()=>performSemanticAudit(audit,{
+    consumerRoot:fixture.root,client:model,signal:controller.signal,
+    onProgress:p=>events.push(p)
+  }),/cancelled/);
+  assert.equal(calls,1);
+  assert.deepEqual(events,[{claim:1,total:2}]);
+  assert.deepEqual(fs.readFileSync(path.join(audit,'repair-proposals.json')),original);
+  assert.equal(fs.existsSync(path.join(audit,'semantic-audit.json')),false);
 });

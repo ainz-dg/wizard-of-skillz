@@ -16,7 +16,8 @@ import {parseJsonContent} from './llm-client.mjs';
 const MAX_CAPTURE=2*1024*1024;
 const DEFAULT_TIMEOUT=180000;
 
-export function executeCli(binary,args,{input='',cwd,timeoutMs=DEFAULT_TIMEOUT,spawnImpl=spawn}={}){
+export function executeCli(binary,args,{input='',cwd,timeoutMs=DEFAULT_TIMEOUT,spawnImpl=spawn,signal=null}={}){
+  if(signal?.aborted)throw Error(binary+' cancelled');
   if(!cwd)throw Error('Isolated working directory required');
   if(!Number.isFinite(Number(timeoutMs))||Number(timeoutMs)<=0)
     throw Error('CLI timeout must be positive');
@@ -27,8 +28,10 @@ export function executeCli(binary,args,{input='',cwd,timeoutMs=DEFAULT_TIMEOUT,s
     let stdout='',stderr='',done=false;
     const finish=(error,value)=>{
       if(done)return;done=true;clearTimeout(timer);
+      signal?.removeEventListener('abort',onAbort);
       if(error)reject(error);else resolve(value);
     };
+    const onAbort=()=>{child.kill('SIGKILL');finish(Error(binary+' cancelled'));};
     const timer=setTimeout(()=>{
       child.kill('SIGKILL');finish(Error(binary+' timed out'));
     },Number(timeoutMs));
@@ -47,6 +50,8 @@ export function executeCli(binary,args,{input='',cwd,timeoutMs=DEFAULT_TIMEOUT,s
     });
     child.stdin?.on('error',error=>{if(error.code!=='EPIPE')finish(error);});
     child.stdin?.end(input);
+    signal?.addEventListener('abort',onAbort,{once:true});
+    if(signal?.aborted)onAbort();
   });
 }
 export class AccountCliClient {
@@ -61,18 +66,19 @@ export class AccountCliClient {
     try{return await action(dir);}
     finally{fs.rmSync(dir,{recursive:true,force:true});}
   }
-  async completeJson({system,user}={}){
+  async completeJson({system,user,signal=null}={}){
     if(typeof system!=='string'||typeof user!=='string')throw Error('Prompt requires system and user text');
     const input=system+'\n\nReturn machine-readable JSON only. Do not access external files, run tools, or execute code.\n\n'+user;
     return this._withScratch(async cwd=>{
       let text;
       if(this.provider==='codex-account'){
         const answer=path.join(cwd,'answer.txt');
-        const args=['exec','--sandbox','read-only','--ask-for-approval','never',
+        // Global approval flag precedes 'exec'; never grant write access.
+        const args=['--ask-for-approval','never','exec','--sandbox','read-only',
           '--skip-git-repo-check','--output-last-message',answer];
         if(this.model)args.push('--model',this.model);
         args.push('-');
-        await this.run('codex',args,{input,cwd,timeoutMs:this.timeoutMs});
+        await this.run('codex',args,{input,cwd,timeoutMs:this.timeoutMs,signal});
         if(!fs.existsSync(answer))throw Error('Codex did not produce a final answer');
         text=fs.readFileSync(answer,'utf8');
       }else{
@@ -81,9 +87,10 @@ export class AccountCliClient {
           '--no-session-persistence','--output-format','text'];
         if(this.model)args.push('--model',this.model);
         args.push('-p');
-        const result=await this.run('claude',args,{input,cwd,timeoutMs:this.timeoutMs});
+        const result=await this.run('claude',args,{input,cwd,timeoutMs:this.timeoutMs,signal});
         text=result.stdout;
       }
+      if(signal?.aborted)throw Error('CLI inference cancelled');
       return parseJsonContent(text);
     });
   }
