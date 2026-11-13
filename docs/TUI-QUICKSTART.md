@@ -2,14 +2,16 @@
 
 ## Install from npm
 
-Requires Node.js 22.12 or later. The published experimental prerelease is
-`0.5.0-rc.5`; `@next` currently points to that version.
+Requires Node.js 22.12 or later. `@next` points to the most recently
+published experimental prerelease, which may lag behind the current `main`
+branch until an owner-approved GitHub release.
 
 ```sh
 npx --yes wizard-of-skillz@next
-# For a repeatable install:
-npx --yes wizard-of-skillz@0.5.0-rc.5
 ```
+
+For a repeatable install, replace `@next` with an exact version already
+published on npm (do not assume that an unreleased candidate is available).
 
 Use a disposable, non-sensitive local repository for a first run. The
 no-argument command opens the TUI in the current directory; choose

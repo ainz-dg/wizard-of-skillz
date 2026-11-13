@@ -8,7 +8,7 @@
 
 A generic, terminal-first, human-controlled assistant for reviewing and maintaining [Agent Skills](https://agentskills.io/).
 
-**Status:** [`0.5.0-rc.5`](https://github.com/ainz-dg/wizard-of-skillz/releases/tag/v0.5.0-rc.5) is published as an experimental prerelease on npm (`next`).
+**Status:** Experimental prereleases are published to npm under the `next` tag. The `main` branch may contain a release candidate that has **not yet been published**; check [GitHub releases](https://github.com/ainz-dg/wizard-of-skillz/releases) for approved versions.
 
 ## Install and launch
 
@@ -18,7 +18,7 @@ Requires Node.js **22.12 or later**. Open a terminal and run:
 npx --yes wizard-of-skillz@next
 ```
 
-Or pin the tested prerelease: `npx --yes wizard-of-skillz@0.5.0-rc.5`.
+For reproducible installations, replace `@next` with the exact **published** version.
 The TUI starts in the current directory; choose **Scegli il progetto da analizzare** to select another local repository. Initial scans are offline; using an AI provider and applying edits require explicit actions. For your first run, choose a disposable, non-sensitive project. See the [TUI quickstart](docs/TUI-QUICKSTART.md).
 
 ## Use Wizard: TUI first
@@ -90,4 +90,4 @@ See [TUI quickstart](docs/TUI-QUICKSTART.md), [LLM provider and Ollama setup](do
 
 ## Open source readiness
 
-**License:** [Apache License 2.0](LICENSE). The published `0.5.0-rc.5` prerelease includes the reviewed same-repository audit and bounded evidence-selection fixes. Merges never publish: the owner must explicitly publish a GitHub prerelease. See the [release guide](docs/RELEASING.md) and [rc.5 notes](docs/releases/0.5.0-rc.5.md).
+**License:** [Apache License 2.0](LICENSE). Merges never publish: the owner must explicitly authorize a GitHub prerelease. See the [release guide](docs/RELEASING.md), [RC5 notes](docs/releases/0.5.0-rc.5.md) and [RC6 candidate notes](docs/releases/0.5.0-rc.6.md).
