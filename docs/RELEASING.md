@@ -6,10 +6,14 @@ private Agent Skills catalog.
 
 ## Current status
 
-- Latest published experimental prerelease: **`0.5.0-rc.5`** (November 11, 2026).
+- Last verified publication when RC6 preparation started: **`0.5.0-rc.5`** (November 11, 2026).
 - GitHub: [v0.5.0-rc.5](https://github.com/ainz-dg/wizard-of-skillz/releases/tag/v0.5.0-rc.5).
+- **`0.5.0-rc.6` is a prepared candidate, not a confirmed npm publication.**
+  It requires a separately approved release after the release-preparation PR
+  passes CI and the dry-run archive is reviewed.
 - npm dist-tag: `next`; the prerelease does **not** use `latest`.
-- Install: `npx --yes wizard-of-skillz@next` or pin `@0.5.0-rc.5`.
+- Install: `npx --yes wizard-of-skillz@next` (resolves to the latest **published**
+  prerelease). Pin a specific published version for repeatable installations.
 - The npm Trusted Publishing (OIDC) publish step succeeded. The release workflow
   [43036735181](https://github.com/ainz-dg/wizard-of-skillz/actions/runs/43036735181)
   is marked failed because its registry-visibility check ran before npm finished
