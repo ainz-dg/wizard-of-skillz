@@ -51,7 +51,9 @@ export function buildReviewCatalog(source,{previews=null}={}) {
     if(!ACTIONS.has(action))throw Error('Unknown action for '+p.id);
     const evidence=(Array.isArray(p.evidence)?p.evidence:[]).map(e=>{
       if(!plain(e) || !hasText(e.repo) || !hasText(e.path))throw Error('Invalid evidence for '+p.id);
-      return {repo:e.repo,path:e.path,sha256:SHA.test(e.sha256||'')?e.sha256:null};
+      return {repo:e.repo,path:e.path,sha256:SHA.test(e.sha256||'')?e.sha256:null,
+        ...(Number.isInteger(e.line)&&e.line>0?{line:e.line}:{}),
+        ...(hasText(e.quote)?{quote:e.quote}:{} )};
     });
     let sourceLoc=p.source ? safeLocation(p.source) : null;
     let targetLoc=p.target ? safeLocation(p.target) : null;

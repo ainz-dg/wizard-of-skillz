@@ -23,6 +23,10 @@ import {overviewActions,activeOverviewChoice,moveOverviewChoice} from './tui-men
 import {wrapTuiLines,evidenceDetailLines} from './tui-readable.mjs';
 import {reviewWindow,reviewRow,draftInstructions,renderReviewWorkspace} from './tui-review-layout.mjs';
 import {decorateWizardOverview} from './tui-brand.mjs';
+import {agentProviders,loadWizardSkill} from './agent-harness.mjs';
+import {agentReviewPrompt,agentRevisionPrompt,parseAgentReview,parseAgentRevision,
+  writeAgentReviewSession,loadAgentOriginal} from './agent-review.mjs';
+import {stageUpdateText} from './review-candidates.mjs';
 
 const CSI='\x1b[';
 const palette={cyan:'96',green:'92',yellow:'93',red:'91',blue:'94',magenta:'95',gray:'37',bold:'1',dim:'37'};
@@ -207,7 +211,9 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
   columns=90,rows=28,colors=true,applyConfigured=false,
   editorConfigured=false,modelConfigured=false,
   providerPickerEnabled=false,providerSelection=null,providerWizard=null,domainWizard=null,
-  projectWizard=null,projectRoot=null,canChooseProject=false,canUseDomain=false}={}){
+  projectWizard=null,agentWizard=null,agentQuestion=null,agentReview=null,
+  agentConfigured=false,agentProvider='Codex CLI',
+  projectRoot=null,canChooseProject=false,canUseDomain=false}={}){
   // Honor the reported viewport height, including blank padding and footer.
   const items=catalog.items||[],width=Math.max(40,columns);
   const height=Number.isInteger(rows)&&rows>0?rows:28;
@@ -233,6 +239,44 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
   if(state.notice)lines.push(fmt(state.notice,'yellow'));
   if(providerPickerEnabled&&!guidedOverview&&!tinyDetail)
     lines.push(fmt('Modello: '+providerDescription(providerSelection),'gray'));
+  if(agentWizard){
+    lines.push('',fmt('REVISIONE AGENT-FIRST · Harness utente','cyan'));
+    if(agentWizard.step==='provider'){
+      lines.push(fmt('Scegli un harness disponibile. Nessuna invocazione prima della conferma.','bold'),
+        ...agentProviders().map((provider,index)=>fmt((index+1)+'  '+provider.label+
+          (provider.implemented?
+            (agentWizard.codexAvailable===false?' · non disponibile':' · adapter sperimentale'):
+            ' · pianificato, non integrato in questa slice'),
+          provider.implemented?'bold':'gray')));
+    }else if(agentWizard.step==='model'){
+      lines.push(fmt('Modello Codex (facoltativo; INVIO usa il default del CLI)','bold'),
+        fmt('> '+(agentWizard.text||'(default CLI)'),'cyan'),
+        fmt('Il profilo, l’account e la configurazione restano quelli locali di Codex.','gray'));
+    }else if(agentWizard.step==='confirm'){
+      lines.push(fmt('Provider: Codex CLI · modello '+(agentWizard.model||'predefinito CLI'),'bold'),
+        fmt('Workspace: '+(projectRoot??'non selezionato'),'bold'),
+        fmt('L’agente può leggere il workspace; Codex usa il tuo account e sandbox read-only.','yellow'),
+        fmt('Continua solo se il tuo account è autorizzato a trattare questi dati.','yellow'),
+        fmt('Il report e le proposte saranno salvati fuori dal progetto.','gray'),
+        fmt('Y Conferma e avvia · ESC Annulla','bold'));
+    }
+    return pinCommandHints(lines,[
+      agentWizard.step==='provider'?'1 Codex CLI  2–4 pianificati':'Digita modello facoltativo  INVIO Conferma',
+      'ESC Annulla · l’invio al provider richiede la conferma Y'
+    ],{height,width,fmt});
+  }
+  if(agentQuestion){
+    lines.push('',fmt('CHIARIMENTO / REVISIONE DI UNA PROPOSTA','cyan'),
+      fmt('Proposta: '+agentQuestion.title,'bold'),
+      fmt('Domanda da inviare al '+(agentQuestion.provider??agentProvider)+' autenticato:','yellow'),
+      fmt('> '+(agentQuestion.text||''),'cyan'));
+    if(agentQuestion.notice)lines.push(fmt(agentQuestion.notice,'yellow'));
+    lines.push(fmt('La risposta può aggiornare solo la bozza; il diff va revisionato di nuovo.','gray'));
+    return pinCommandHints(lines,[
+      'Digita domanda · INVIO Invia · BACKSPACE Cancella',
+      'ESC Annulla · nessun Apply viene eseguito'
+    ],{height,width,fmt});
+  }
   if(providerWizard){
     lines.push('',fmt('SCELTA PROVIDER LLM — Nessuna richiesta al modello','cyan'));
     if(providerWizard.step==='menu'){
@@ -354,7 +398,8 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
     const options=overviewActions({
       hasSemanticReport:Boolean(semanticAudit),modelConfigured,providerPickerEnabled,
       proposalCount:items.length,modelLabel:providerDescription(providerSelection),
-      canChooseProject,canUseDomain,projectLabel:projectRoot??'non selezionato'
+      canChooseProject,canUseDomain,projectLabel:projectRoot??'non selezionato',
+      agentConfigured,hasAgentReport:Boolean(agentReview),agentProvider
     });
     const active=activeOverviewChoice(options,state.overviewChoice);
     const compact=height<20;
@@ -391,6 +436,10 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
         semanticAudit.proposed_updates+' ipotesi UPDATE · NON sono prove.','yellow'));
     else
       lines.push(fmt('Audit semantico: non ancora eseguito (facoltativo: K).','yellow'));
+    if(agentReview)lines.push(fmt('Agent-first: '+agentReview.recommendation_count+
+      ' raccomandazioni · '+catalog.items.length+' UPDATE con diff · '+
+      (agentReview.unsupported_actions?.length??0)+' altre solo nel report · nessuna modifica applicata.',
+      (agentReview.unsupported_actions?.length??0)?'yellow':'green'));
     if(!compact)lines.push('');
     lines.push(fmt('COSA VUOI FARE?   ↑↓ e INVIO','cyan'));
     for(const option of options)
@@ -399,6 +448,20 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
     if(active)lines.push('',fmt('  '+active.description,'gray'));
     if(!compact)lines.push('',
       fmt('Le modifiche si preparano separatamente e si applicano solo con G → Y.','yellow'));
+  }else if(state.view==='agent-report'){
+    const reportLines=wrapTuiLines(String(agentReview?.markdown??'Report agente non disponibile.')
+      .split(/\r?\n/),Math.max(20,width-4));
+    const max=Math.max(1,height-lines.length-5);
+    const start=Math.max(0,Math.min(state.scroll??0,Math.max(0,reportLines.length-max)));
+    lines.push(fmt('REPORT AGENT-FIRST · giudizio e proposte, non approvazione','green'),
+      fmt('Righe '+(reportLines.length?start+1:0)+'–'+
+        Math.min(reportLines.length,start+max)+'/'+reportLines.length,'gray'));
+    for(const line of reportLines.slice(start,start+max))lines.push(fmt(line,'bold'));
+    if(state.scroll===0&&agentReview?.unsupported_actions?.length){
+      lines.push('',fmt('Proposte non collegate a un diff gestito da questa slice:','yellow'));
+      for(const item of agentReview.unsupported_actions)
+        lines.push(fmt('• '+item.action+' · '+item.title+' — leggibile nel report, non applicabile qui.','yellow'));
+    }
   }else if(state.view==='list'){
     const query=state.searching?state.searchDraft:state.search;
     const ready=items.filter(item=>item.readiness==='PREVIEW_READY').length;
@@ -618,7 +681,8 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
   return pinCommandHints(branded,commandHints(state.view,{
     narrow:width<90,twoPane:width>=100&&height>=20,searching:state.searching,
     providerPickerEnabled,modelConfigured,editorConfigured,applyConfigured,
-    proposalCount:items.length,hasSemanticReport:Boolean(semanticAudit)
+    proposalCount:items.length,hasSemanticReport:Boolean(semanticAudit),
+    agentConfigured
   }),{height,width,fmt});
 }
 
@@ -633,7 +697,8 @@ export function reviewSessionDraft(catalog,state){
 
 export async function runReviewTui(folder,{input=process.stdin,output=process.stdout,
   consumerRoot=null,providerRoot=null,clientFactory=null,editor=undefined,
-  moveDestinationDir=null,providerFactory=null,initialProvider=null}={}){
+  moveDestinationDir=null,providerFactory=null,initialProvider=null,
+  agentFactory=null}={}){
   if(!input.isTTY||!output.isTTY||!input.setRawMode)
     throw Error('La TUI richiede un terminale interattivo (TTY).');
   const load=(file,required=false)=>{
@@ -647,11 +712,27 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
   const extra={previews,scopeHints:load('scope-hints.json'),
     sourceChecks:load('source-consistency.json'),localScan:load('local-scan-summary.json'),
     semanticAudit:load('semantic-audit.json')};
+  const readAgentSession=target=>{
+    const reportFile=path.join(target,'agent-review.md');
+    if(!fs.existsSync(reportFile))return null;
+    let metadata={};
+    try{metadata=JSON.parse(fs.readFileSync(path.join(target,'agent-review.json'),'utf8'));}catch{}
+    return {markdown:fs.readFileSync(reportFile,'utf8'),
+      recommendation_count:Number(metadata.recommendation_count)||0,
+      provider:metadata.provider??'codex',model:metadata.model??'CLI default',
+      skill_sha256:metadata.skill_sha256??null};
+  };
+  let agentReview=readAgentSession(folder);
+  let agentSelection=agentReview?{provider:agentReview.provider,
+    model:agentReview.model==='CLI default'?null:agentReview.model}:null;
   let state=initialTuiState({guided:true});
   let providerSelection=initialProviderSelection(initialProvider??{});
   let providerWizard=null;
   let domainWizard=null;
   let projectWizard=null;
+  let agentWizard=null;
+  let agentQuestion=null;
+  let activeAgent=null;
   try{
     const stored=readReviewSession(folder);
     if(stored){
@@ -670,7 +751,9 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     editorConfigured:Boolean(consumerRoot),
     modelConfigured:Boolean(consumerRoot && (clientFactory||providerFactory)),
     providerPickerEnabled:typeof providerFactory==='function',
-    providerSelection,providerWizard,domainWizard,projectWizard,
+    providerSelection,providerWizard,domainWizard,projectWizard,agentWizard,agentQuestion,
+    agentReview,agentConfigured:typeof agentFactory==='function',
+    agentProvider:agentSelection?.provider==='codex'?'Codex CLI':'coding agent non selezionato',
     projectRoot:consumerRoot,canChooseProject:true,canUseDomain:Boolean(consumerRoot)
   }));
   let busy=false;
@@ -981,6 +1064,152 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     state.notice='';
     draw();
   };
+  const beginAgent=()=>{
+    if(typeof agentFactory!=='function'){
+      state.notice='Agent-first non disponibile: nessun harness installato.';return;
+    }
+    if(!consumerRoot){state.notice='Scegli prima il progetto da analizzare.';return;}
+    agentWizard={step:'provider',text:'',model:null,notice:''};
+    state.notice='';
+  };
+  const runAgentReview=async()=>{
+    if(!consumerRoot||!agentSelection||typeof agentFactory!=='function'){
+      state.notice='Seleziona progetto e coding agent prima di iniziare.';agentWizard=null;draw();return;
+    }
+    const controller=new AbortController();activeController=controller;busy=true;
+    state.notice='Agent-first in corso · '+agentSelection.provider+' · ESC annulla';
+    draw();
+    try{
+      const skillText=loadWizardSkill();
+      const auditRoot=fs.realpathSync(folder),selectedRoot=fs.realpathSync(consumerRoot);
+      if(auditRoot===selectedRoot||auditRoot.startsWith(selectedRoot+path.sep))
+        throw Error('L’output della revisione deve restare fuori dal progetto selezionato');
+      const prompt=agentReviewPrompt({skillText,
+        workspaceLabel:consumerRoot,
+        task:'Review the Agent Skills knowledge in this workspace. Explore the existing skills, repository instructions, documentation and relevant source/tests. Recommend only useful and actionable changes; keep canonical files read-only.'});
+      activeAgent=agentFactory({...agentSelection});
+      const result=await activeAgent.reviewWorkspace({workspaceRoot:consumerRoot,
+        skillText,prompt,signal:controller.signal});
+      if(controller.signal.aborted)throw Error('Agent review cancelled');
+      const repoId=extra.localScan?.repository??'local/'+path.basename(consumerRoot);
+      const parsed=parseAgentReview(result.report,{workspaceRoot:consumerRoot,repositoryId:repoId});
+      const outputDir=fs.mkdtempSync(path.join(fs.realpathSync(folder),'.wizard-agent-review-'));
+      fs.chmodSync(outputDir,0o700);
+      const saved=writeAgentReviewSession(outputDir,{...parsed,report:result.report,
+        provider:result.provider,model:result.model,skill_sha256:result.skill_sha256},
+      {consumerRoot});
+      folder=saved.folder;
+      proposals=load('repair-proposals.json',true);
+      previews=loadReviewPreviews(folder,proposals,null);
+      catalog=buildReviewCatalog(proposals,{previews});
+      extra.previews=previews;extra.semanticAudit=null;
+      agentReview={markdown:parsed.markdown,recommendation_count:parsed.total_recommendations,
+        provider:result.provider,model:result.model,skill_sha256:result.skill_sha256,
+        unsupported_actions:parsed.unsupported_actions,folder};
+      agentSelection={provider:result.provider,
+        model:result.model==='CLI default'?null:result.model};
+      state={...initialTuiState({guided:true}),view:'agent-report',scroll:0,
+        notice:'Report pronto: '+parsed.total_recommendations+
+          ' raccomandazioni; '+saved.proposal_count+
+          ' UPDATE preparate come diff da revisionare. Nessuna scrittura nel progetto.'};
+    }catch(error){
+      state.notice=controller.signal.aborted?'Revisione agentica annullata; nessun file del progetto modificato.':
+        'AGENT REVIEW: '+error.message;
+    }finally{
+      activeController=null;activeAgent=null;agentWizard=null;busy=false;draw();
+    }
+  };
+  const verifyAgentProvider=async()=>{
+    if(!agentWizard||agentWizard.step!=='provider')return;
+    const agent=agentFactory?.({provider:'codex',model:null});
+    if(!agent||typeof agent.doctor!=='function'){
+      agentWizard={...agentWizard,codexAvailable:false,notice:'Adapter Codex non disponibile.'};return;
+    }
+    busy=true;agentWizard={...agentWizard,notice:'Verifica Codex CLI e login locale…'};draw();
+    try{
+      const status=await agent.doctor();
+      agentSelection={provider:'codex',model:null};
+      agentWizard={...agentWizard,step:'model',text:'',codexAvailable:true,
+        account:status.auth,version:status.version,notice:''};
+    }catch(error){
+      agentWizard={...agentWizard,codexAvailable:false,notice:'Codex non pronto: '+error.message};
+    }finally{busy=false;draw();}
+  };
+  const agentWizardKey=(ch,command)=>{
+    const w=agentWizard;if(!w)return;
+    if(command==='escape'){agentWizard=null;state.notice='Avvio agent-first annullato.';return;}
+    if(w.step==='provider'){
+      const selected=agentProviders()[Number(command)-1];
+      if(selected?.implemented)void verifyAgentProvider();
+      else if(selected)
+        agentWizard={...w,notice:selected.label+' sarà integrato e validato prima di una release agent-first.'};
+      return;
+    }
+    if(w.step==='model'){
+      if(command==='backspace')agentWizard={...w,text:w.text.slice(0,-1)};
+      else if(command==='enter')agentWizard={...w,step:'confirm',model:w.text.trim()||null};
+      else if(typeof ch==='string'&&ch.length===1&&!/[\x00-\x1f\x7f]/.test(ch)&&w.text.length<200)
+        agentWizard={...w,text:w.text+ch};
+      return;
+    }
+    if(w.step==='confirm'&&command==='y')void runAgentReview();
+  };
+  const beginAgentQuestion=()=>{
+    if(!agentReview||!agentSelection||typeof agentFactory!=='function'){
+      state.notice='La revisione agentica non è disponibile per questa sessione.';return;
+    }
+    if(state.view!=='list'||!consumerRoot){state.notice='Apri l’elenco e seleziona una proposta.';return;}
+    const item=catalog.items[state.cursor];
+    if(!item||item.action!=='UPDATE'){
+      state.notice='Il chiarimento agentico è disponibile per proposte UPDATE di SKILL.md.';return;
+    }
+    agentQuestion={proposalId:item.id,title:item.title,text:'',notice:'',
+      provider:agentSelection.provider};
+  };
+  const sendAgentQuestion=async()=>{
+    const current=agentQuestion;
+    if(!current?.text.trim()){
+      agentQuestion={...current,notice:'Scrivi una domanda specifica prima di inviarla.'};draw();return;
+    }
+    const controller=new AbortController();activeController=controller;busy=true;
+    agentQuestion={...current,notice:'L’agente sta verificando questa proposta…'};draw();
+    try{
+      const snapshot=loadAgentOriginal(folder,{consumerRoot,proposalIds:[current.proposalId]});
+      if(Buffer.byteLength(snapshot.original,'utf8')>40000)
+        throw Error('Skill troppo grande per un chiarimento circoscritto; usa l’editor.');
+      const skillText=loadWizardSkill();
+      const prompt=agentRevisionPrompt({skillText,proposal:snapshot.proposal,
+        original:snapshot.original,candidate:snapshot.candidate,question:current.text});
+      const agent=agentFactory({...agentSelection});
+      const result=await agent.reviewWorkspace({workspaceRoot:consumerRoot,skillText,prompt,
+        signal:controller.signal});
+      if(controller.signal.aborted)throw Error('Revision cancelled');
+      const revision=parseAgentRevision(result.report);
+      fs.writeFileSync(path.join(folder,'agent-revision-'+
+        current.proposalId.replace(/[^a-zA-Z0-9_-]/g,'_')+'-'+Date.now()+'.md'),
+      revision.markdown+'\n',{flag:'wx',mode:0o600});
+      if(revision.replacement!==null){
+        const staged=stageUpdateText(folder,{consumerRoot,proposalId:current.proposalId,
+          content:revision.replacement});
+        agentQuestion=null;
+        refreshDraft('Revisione agentica preparata: controlla il nuovo diff. Nessun file modificato.',
+          {method:'AGENT',ids:[staged.proposal_id]});
+      }else{
+        agentQuestion={...current,notice:'L’agente non ha proposto una nuova versione: '+revision.rationale};
+      }
+    }catch(error){
+      agentQuestion={...current,notice:controller.signal.aborted?
+        'Richiesta annullata. La bozza precedente è invariata.':error.message};
+    }finally{activeController=null;busy=false;draw();}
+  };
+  const agentQuestionKey=(ch,command)=>{
+    if(!agentQuestion)return;
+    if(command==='escape'){agentQuestion=null;return;}
+    if(command==='backspace')agentQuestion={...agentQuestion,text:agentQuestion.text.slice(0,-1),notice:''};
+    else if(command==='enter')void sendAgentQuestion();
+    else if(typeof ch==='string'&&ch.length===1&&!/[\x00-\x1f\x7f]/.test(ch)&&
+      agentQuestion.text.length<2000)agentQuestion={...agentQuestion,text:agentQuestion.text+ch,notice:''};
+  };
   const acceptProvider=()=>{
     validateProviderSelection(providerWizard.draft);
     providerSelection={...providerWizard.draft};
@@ -1138,6 +1367,8 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       return;
     }
     if(key.ctrl&&command==='c'){finish();return;}
+    if(agentWizard){agentWizardKey(ch,command);draw();return;}
+    if(agentQuestion){agentQuestionKey(ch,command);draw();return;}
     if(providerWizard){
       try{providerKey(ch,command);}catch(error){state.notice='LLM: '+error.message;}
       draw();return;
@@ -1169,6 +1400,15 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       beginProvider();return;
     }
     if(command==='q'&&!state.searching){finish();return;}
+    if(state.view==='agent-report'){
+      if(command==='escape')state={...state,view:'overview',scroll:0};
+      else if(command==='enter'||command==='v')
+        state={...state,view:'list',cursor:0,scroll:0};
+      else if(command==='n')beginAgent();
+      else if(command==='up'||command==='down')
+        state={...state,scroll:Math.max(0,(state.scroll??0)+(command==='up'?-1:1))};
+      draw();return;
+    }
     if(state.view==='overview'&&['up','down','enter','v'].includes(command)){
       const options=overviewActions({
         hasSemanticReport:Boolean(extra.semanticAudit),
@@ -1176,7 +1416,9 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         providerPickerEnabled:typeof providerFactory==='function',
         proposalCount:catalog.items.length,modelLabel:providerDescription(providerSelection),
         canChooseProject:true,canUseDomain:Boolean(consumerRoot),
-        projectLabel:consumerRoot??'non selezionato'
+        projectLabel:consumerRoot??'non selezionato',
+        agentConfigured:typeof agentFactory==='function',hasAgentReport:Boolean(agentReview),
+        agentProvider:'Codex CLI'
       });
       if(command==='up'||command==='down'){
         state.overviewChoice=moveOverviewChoice(options,state.overviewChoice,
@@ -1193,6 +1435,10 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         draw();return;
       }
       if(chosen?.id==='provider'){beginProvider();return;}
+      if(chosen?.id==='agent-review'){beginAgent();draw();return;}
+      if(chosen?.id==='agent-report'){
+        state={...state,view:'agent-report',scroll:0};draw();return;
+      }
       if(chosen?.id==='proposals'){
         state=updateTuiState(state,'enter',catalog.items.length,{items:catalog.items});
         draw();return;
@@ -1245,6 +1491,12 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     }
     if(command==='m' && state.view==='list' && !state.searching){
       void modelMessage();return;
+    }
+    if(command==='c' && state.view==='list' && !state.searching){
+      beginAgentQuestion();draw();return;
+    }
+    if(command==='c' && state.view==='detail'){
+      state={...state,view:'list'};beginAgentQuestion();draw();return;
     }
     if(command==='r' && state.view==='list' && !state.searching){
       lifecycleMessage();return;

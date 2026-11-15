@@ -4,7 +4,8 @@
  */
 export function overviewActions({hasSemanticReport=false,modelConfigured=false,
   providerPickerEnabled=false,proposalCount=0,modelLabel='not configured',
-  canChooseProject=false,canUseDomain=false,projectLabel='current directory'}={}){
+  canChooseProject=false,canUseDomain=false,projectLabel='current directory',
+  agentConfigured=false,hasAgentReport=false,agentProvider='Codex CLI'}={}){
   const actions=[];
   if(hasSemanticReport){
     actions.push({
@@ -21,6 +22,13 @@ export function overviewActions({hasSemanticReport=false,modelConfigured=false,
       description:'Invia le istruzioni e frammenti di codice al modello: '+modelLabel+'.'
     });
   }
+  if(agentConfigured)actions.push(hasAgentReport?{
+    id:'agent-report',title:'Leggi il report / nuova revisione agent-first',
+    description:'Leggi le raccomandazioni; N avvia una sessione agentica separata.'
+  }:{
+    id:'agent-review',title:'Revisione agent-first con '+agentProvider,
+    description:'L’agente esplora il progetto in sola lettura; nessuna patch viene applicata.'
+  });
   actions.push({
     id:'proposals',title:'Esamina le proposte locali ('+proposalCount+')',
     description:proposalCount?

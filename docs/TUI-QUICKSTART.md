@@ -39,6 +39,12 @@ All common workflows start in the same terminal UI:
   another provider with **L** and select this action to keep the earlier audit
   and drafts untouched in their previous external review directory.
 - **Esamina le proposte locali:** inspect and approve supported changes.
+- **Revisione agent-first (sperimentale):** lets the locally configured Codex
+  CLI inspect the selected workspace read-only. Wizard presents the agent's
+  narrative report first; supported `SKILL.md` UPDATE recommendations become
+  ordinary reviewable drafts. Press `C` on an UPDATE to ask a focused follow-up.
+  A changed draft still requires the existing `G` then `Y` Apply flow. No agent
+  write is applied automatically.
 - **Cambia modello:** choose a provider for the next audit without invoking it.
   **K** analyzes skills; **M** prepares a revision draft for a selected UPDATE.
 
@@ -67,6 +73,29 @@ Not every command is available on every screen: press **?** for contextual help.
 Offline findings are bounded structural observations, not semantic proof. Drafts, staged proposals, saved sessions and model outputs cannot authorize Apply. Before confirming, inspect the full diff, source, destination and backups. Paths, symlinks and hashes are rechecked; rollback is best effort, **not an atomic multi-file transaction**. Never use elevated privileges.
 
 Model calls are opt-in and can send selected skill/source excerpts to the chosen service. See [Ollama and provider setup](OLLAMA.md). No organization-specific adapters are shipped.
+
+The experimental agent-first adapter uses the user's installed and authenticated
+Codex CLI (`codex`), including its account, model and local configuration. The
+selected workspace is passed with Codex's read-only sandbox. Claude Code,
+GitHub Copilot CLI and OpenCode agent adapters are not implemented in this
+slice; legacy model providers remain separate from tool-enabled agents. Do not
+use this experimental feature on sensitive source unless the configured account
+is authorized to process it.
+
+To try the synthetic fixture from a source checkout:
+
+```sh
+npm install
+node bin/wizard.mjs scan tests/fixtures/agent-first-css-tokens --out /tmp/wizard-agent-first-review
+```
+
+In the TUI choose **Revisione agent-first**, select **Codex CLI**, inspect the
+configured model, then press `Y` only if you authorize this account to read the
+fixture. After the report, press Enter to open recommendations; select the
+`UPDATE`, press `C` for a focused clarification, inspect the refreshed diff,
+then either press Escape and discard/cancel or use the existing `G` then `Y`
+flow to apply only to this disposable fixture. The three other agent harnesses
+are visible but not implemented in this slice.
 
 
 ## Resources-first domain setup (experimental)
