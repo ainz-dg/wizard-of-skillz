@@ -6,9 +6,11 @@ import path from 'node:path';
 import {PassThrough} from 'node:stream';
 import {fileURLToPath} from 'node:url';
 import {createLocalScan} from '../src/local-scan.mjs';
-import {CodexAgentAdapter,agentProviders,createAgentHarness,loadWizardSkill} from '../src/agent-harness.mjs';
+import {buildReviewCatalog} from '../src/review-selection.mjs';
+import {CodexAgentAdapter,agentProviders,createAgentHarness,loadWizardSkill,
+  sanitizeAgentDiagnostic} from '../src/agent-harness.mjs';
 import {agentReviewPrompt,parseAgentReview} from '../src/agent-review.mjs';
-import {runReviewTui} from '../src/review-tui.mjs';
+import {initialTuiState,renderReviewTui,runReviewTui} from '../src/review-tui.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const fixture=path.join(here,'fixtures/agent-first-css-tokens');
@@ -49,6 +51,10 @@ test("Codex adapter keeps the user's CLI account and requests read-only ephemera
   assert.equal(calls[0].options.cwd,fs.realpathSync(root));
   assert.match(calls[0].options.input,/Audit only/);
   assert.match(calls[0].options.input,/SPECIALIST SKILL/);
+  assert.ok(calls[0].args.includes('--skip-git-repo-check'));
+  fs.mkdirSync(path.join(root,'.git'));
+  await adapter.reviewWorkspace({workspaceRoot:root,skillText,prompt});
+  assert.equal(calls[1].args.includes('--skip-git-repo-check'),false);
 });
 
 test('provider boundary exposes planned harnesses without claiming they are implemented',()=>{
@@ -69,6 +75,39 @@ test('agent proposal parser binds evidence and UPDATE target to the current work
   assert.equal(parsed.proposals.proposals[0].evidence[0].line,line);
   assert.throws(()=>parseAgentReview(report(initialReplacement).replace(skillPath,'../secret/SKILL.md'),
     {workspaceRoot:root,repositoryId:'local/sample'}),/Unsafe evidence path|Missing or unsafe/);
+});
+
+test('agent proposal parser accepts exact multiline citations and preserves their line range',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'wizard-agent-multiline-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  fs.mkdirSync(path.dirname(path.join(root,skillPath)),{recursive:true});
+  fs.writeFileSync(path.join(root,skillPath),source);
+  const sourceLines=source.split(/\r?\n/);
+  const quote=sourceLines.slice(line-1,line+2).join('\n');
+  const multilineReport='## Assessment\n\nUpdate needed.\n\n'+footer([
+    {...recommendation(initialReplacement),evidence:[{path:skillPath,line,quote}]}
+  ]);
+  const parsed=parseAgentReview(multilineReport,{workspaceRoot:root,repositoryId:'local/sample'});
+  assert.equal(parsed.proposals.proposals[0].evidence[0].line,line);
+  assert.equal(parsed.proposals.proposals[0].evidence[0].end_line,line+2);
+  const catalog=buildReviewCatalog(parsed.proposals);
+  const screen=renderReviewTui(catalog,{...initialTuiState(),view:'detail'},
+    {columns:90,rows:32,colors:false});
+  assert.ok(screen.includes(skillPath+':'+line+'-'+(line+2)));
+  assert.match(screen,/When a screen needs a color/);
+  const explicitRange='## Assessment\n\nUpdate needed.\n\n'+footer([
+    {...recommendation(initialReplacement),evidence:[{path:skillPath,line,end_line:line+2,quote}]}
+  ]);
+  assert.equal(parseAgentReview(explicitRange,{workspaceRoot:root,repositoryId:'local/sample'})
+    .proposals.proposals[0].evidence[0].end_line,line+2);
+  assert.throws(()=>parseAgentReview(explicitRange.replace('colors remain local','colors belong elsewhere'),
+    {workspaceRoot:root,repositoryId:'local/sample'}),/cites text not present/);
+});
+
+test('agent diagnostics redact bearer secrets and sensitive key values',()=>{
+  const value=sanitizeAgentDiagnostic('Authorization: Bearer abc123 API_KEY=secret-token done');
+  assert.doesNotMatch(value,/abc123|secret-token/);
+  assert.match(value,/\[redacted\]/);
 });
 
 function setup(t){
@@ -139,4 +178,41 @@ test('agent-first TUI: audit, focused revision, diff, then cancel with no source
 
 test('agent-first TUI: explicit guarded Apply updates only the synthetic skill',async t=>{
   await runAgentThroughReview(t,{apply:true});
+});
+
+test('agent-first TUI shows validation failures and preserves the unvalidated report',async t=>{
+  const x=setup(t);
+  const invalid='## Assessment\n\nThere is a candidate.\n\n'+footer([
+    {...recommendation(initialReplacement),evidence:[{path:skillPath,line,quote:'quote not in this file'}]}
+  ]);
+  const task=runReviewTui(x.audit,{consumerRoot:x.root,input:x.input,output:x.output,
+    agentFactory:()=>({doctor:async()=>({ok:true}),
+      reviewWorkspace:async()=>({provider:'codex',model:'fixture-agent',report:invalid})})});
+  try{
+    x.key('return');x.key('1');
+    await waitFor(()=>x.screen().includes('Modello Codex'),'Codex doctor');
+    x.key('return');x.key('y');
+    await waitFor(()=>x.screen().includes('REPORT NON IMPORTATO'),'validation error screen');
+    assert.match(x.screen(),/cites text not present/);
+    assert.match(x.screen(),/Report originale conservato fuori dal progetto/);
+    const preserved=fs.readdirSync(x.audit).find(name=>name.startsWith('.wizard-agent-unvalidated-'));
+    assert.ok(preserved);
+    assert.equal(fs.readFileSync(path.join(x.root,skillPath),'utf8'),source);
+  }finally{x.key('escape');x.key('q');await task;}
+});
+
+test('agent-first TUI displays sanitized CLI failure details',async t=>{
+  const x=setup(t);
+  const task=runReviewTui(x.audit,{consumerRoot:x.root,input:x.input,output:x.output,
+    agentFactory:()=>({doctor:async()=>({ok:true}),
+      reviewWorkspace:async()=>{throw Error('codex failed (exit 1): Not inside a trusted directory. Authorization: Bearer abc123');}})});
+  try{
+    x.key('return');x.key('1');
+    await waitFor(()=>x.screen().includes('Modello Codex'),'Codex doctor');
+    x.key('return');x.key('y');
+    await waitFor(()=>x.screen().includes('REPORT NON IMPORTATO'),'CLI error screen');
+    assert.match(x.screen(),/Not inside a trusted directory/);
+    assert.match(x.screen(),/Authorization: Bearer \[redacted\]/);
+    assert.doesNotMatch(x.screen(),/abc123/);
+  }finally{x.key('escape');x.key('q');await task;}
 });

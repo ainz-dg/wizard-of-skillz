@@ -22,6 +22,28 @@ const PROVIDERS=Object.freeze([
 
 export function agentProviders(){return PROVIDERS.map(p=>({...p}));}
 
+function hasGitMetadata(root){
+  let current=root;
+  while(true){
+    try{
+      const metadata=fs.lstatSync(path.join(current,'.git'));
+      if(metadata.isDirectory()||metadata.isFile())return true;
+    }catch(error){if(error.code!=='ENOENT'&&error.code!=='ENOTDIR')throw error;}
+    const parent=path.dirname(current);
+    if(parent===current)return false;
+    current=parent;
+  }
+}
+
+export function sanitizeAgentDiagnostic(value){
+  return String(value??'').replace(/\u001b\[[0-?]*[ -/]*[@-~]/g,'')
+    .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s"']+/gi,'$1[redacted]')
+    .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret|password)\s*[:=]\s*)[^\s,;"']+/gi,'$1[redacted]')
+    .replace(/\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{16,})\b/g,'[redacted-token]')
+    .replace(/https?:\/\/[^\s/@]+:[^\s/@]+@/gi,'https://[redacted]@')
+    .slice(-1800);
+}
+
 export function executeAgentCli(binary,args,{cwd,input='',timeoutMs=DEFAULT_TIMEOUT,
   signal=null,spawnImpl=spawn}={}){
   if(signal?.aborted)throw Error(binary+' cancelled');
@@ -52,7 +74,7 @@ export function executeAgentCli(binary,args,{cwd,input='',timeoutMs=DEFAULT_TIME
         finish(Error(binary+' diagnostics exceeded limit'));}
     });
     child.once('close',code=>code===0?finish(null,{stdout,stderr}):
-      finish(Error(binary+' failed (exit '+code+'): '+stderr.slice(-650))));
+      finish(Error(binary+' failed (exit '+code+'): '+sanitizeAgentDiagnostic(stderr))));
     child.stdin?.on('error',error=>{if(error.code!=='EPIPE')finish(error);});
     child.stdin?.end(input);
     signal?.addEventListener('abort',onAbort,{once:true});
@@ -93,6 +115,7 @@ export class CodexAgentAdapter{
     try{
       const args=['--ask-for-approval','never','exec','--sandbox','read-only',
         '--ephemeral','--cd',root,'--output-last-message',answer];
+      if(!hasGitMetadata(root))args.splice(2,0,'--skip-git-repo-check');
       if(this.model)args.push('--model',this.model);
       args.push('-');
       await this.run('codex',args,{cwd:root,input:prompt,timeoutMs:this.timeoutMs,signal});

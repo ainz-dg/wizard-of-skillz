@@ -63,6 +63,13 @@ export function renderReviewWorkspace({items,visible,state,semanticAudit=null,pr
       'SKILL: '+(chosen.target?.path??chosen.source?.path??'nessun percorso'),
       'PROPOSTA:',
       chosen.title,'',
+      'EVIDENZE:',
+      ...(chosen.evidence??[]).flatMap(e=>[
+        (e.repo??'')+':'+e.path+(e.line?':'+e.line+
+          (e.end_line&&e.end_line>e.line?'-'+e.end_line:''):''),
+        ...(e.quote?[e.quote]:[])
+      ]),
+      '',
       ...evidenceDetailLines(chosen,semanticAudit));
     if(!semanticAudit || !evidenceDetailLines(chosen,semanticAudit).length)
       right.push('MOTIVO:',chosen.summary??'Non specificato');

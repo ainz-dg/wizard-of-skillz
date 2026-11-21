@@ -20,7 +20,7 @@ export function agentReviewPrompt({skillText,task,workspaceLabel='selected proje
     'Apply the Wizard of Skillz specialist method below. Start with the supplied scope and inspect relevant skills, docs, source and tests as needed. Give an overall assessment and prioritized useful recommendations; KEEP/NO CHANGE is valid. Distinguish verified facts, inference and uncertainty. Do not invent evidence or force findings.',
     'The selected workspace is: '+workspaceLabel,
     'User task: '+task,
-    'After your complete human-readable Markdown report, append exactly one fenced block named `wizard-proposals` containing JSON: {"recommendations":[...]}. This footer is only the connection to the review UI; keep your analysis and rationale in the Markdown report. Each recommendation object has id, action (CREATE|UPDATE|MOVE|REMOVE|KEEP|NO CHANGE|MERGE|SPLIT|DELETE), title, priority, rationale, evidence (array of {path,line,quote}), risks (array), and for UPDATE only: target_path and replacement containing the complete proposed SKILL.md. Limit UPDATE candidates to existing SKILL.md files. Do not claim the UI has verified a correction. If no action is useful, return an empty recommendations array.',
+    'After your complete human-readable Markdown report, append exactly one fenced block named `wizard-proposals` containing JSON: {"recommendations":[...]}. This footer is only the connection to the review UI; keep your analysis and rationale in the Markdown report. Each recommendation object has id, action (CREATE|UPDATE|MOVE|REMOVE|KEEP|NO CHANGE|MERGE|SPLIT|DELETE), title, priority, rationale, evidence (array of {path,line,quote,end_line?}; line is the first cited line and optional end_line is inclusive), risks (array), and for UPDATE only: target_path and replacement containing the complete proposed SKILL.md. Limit UPDATE candidates to existing SKILL.md files. Do not claim the UI has verified a correction. If no action is useful, return an empty recommendations array.',
     'The fenced block must be the final content. JSON strings must be valid JSON. Do not include source code other than complete proposed SKILL.md replacement text for an UPDATE.',
     '\n--- SPECIALIST SKILL ---\n'+skillText
   ].join('\n\n');
@@ -73,13 +73,17 @@ export function parseAgentReview(report,{workspaceRoot,repositoryId}={}){
     ids.add(item.id);
     const evidence=item.evidence.map((entry,n)=>{
       if(!plain(entry)||!text(entry.path)||!Number.isInteger(entry.line)||entry.line<1||
+        (entry.end_line!==undefined&&(!Number.isInteger(entry.end_line)||entry.end_line<entry.line))||
         typeof entry.quote!=='string'||!entry.quote.trim())
         throw Error('Recommendation '+item.id+' has invalid evidence '+n);
       const found=safeFile(root,entry.path),lines=found.content.split(/\r?\n/);
-      if(entry.line>lines.length||!lines[entry.line-1].includes(entry.quote))
+      const normalizedQuote=entry.quote.replace(/\r\n/g,'\n');
+      const endLine=entry.end_line??entry.line+normalizedQuote.split('\n').length-1;
+      const citedText=lines.slice(entry.line-1,endLine).join('\n');
+      if(entry.line>lines.length||endLine>lines.length||!citedText.includes(normalizedQuote))
         throw Error('Recommendation '+item.id+' cites text not present at '+entry.path+':'+entry.line);
       return {repo:repositoryId,path:entry.path,sha256:found.sha256,
-        line:entry.line,quote:entry.quote};
+        line:entry.line,...(endLine>entry.line?{end_line:endLine}:{}),quote:entry.quote};
     });
     if(item.action==='UPDATE'){
       if(!text(item.target_path)||!item.target_path.endsWith('SKILL.md')||
@@ -128,6 +132,18 @@ export function writeAgentReviewSession(folder,review,{consumerRoot}={}){
   return {folder:audit,proposal_count:review.proposals.proposals.length,
     total_recommendations:review.total_recommendations,
     unsupported_actions:review.unsupported_actions};
+}
+
+export function preserveUnvalidatedAgentReport(folder,report,{consumerRoot}={}){
+  if(!path.isAbsolute(folder)||!path.isAbsolute(consumerRoot)||
+    typeof report!=='string'||Buffer.byteLength(report,'utf8')>4_000_000)
+    throw Error('Unvalidated report or output path is invalid or too large');
+  const audit=fs.realpathSync(folder),root=fs.realpathSync(consumerRoot);
+  if(audit===root||audit.startsWith(root+path.sep))
+    throw Error('Unvalidated report output must stay outside the selected workspace');
+  const reportPath=path.join(audit,'agent-review-unvalidated.md');
+  fs.writeFileSync(reportPath,report,{flag:'wx',mode:0o600});
+  return reportPath;
 }
 
 export function agentRevisionPrompt({skillText,proposal,original,candidate,question}={}){

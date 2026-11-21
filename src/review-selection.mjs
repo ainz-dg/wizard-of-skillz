@@ -53,6 +53,7 @@ export function buildReviewCatalog(source,{previews=null}={}) {
       if(!plain(e) || !hasText(e.repo) || !hasText(e.path))throw Error('Invalid evidence for '+p.id);
       return {repo:e.repo,path:e.path,sha256:SHA.test(e.sha256||'')?e.sha256:null,
         ...(Number.isInteger(e.line)&&e.line>0?{line:e.line}:{}),
+        ...(Number.isInteger(e.end_line)&&e.end_line>=(e.line??1)?{end_line:e.end_line}:{}),
         ...(hasText(e.quote)?{quote:e.quote}:{} )};
     });
     let sourceLoc=p.source ? safeLocation(p.source) : null;
@@ -229,7 +230,8 @@ export function renderReviewMarkdown(catalog,selection){
     if(item.summary)lines.push('- Motivo: '+md(item.summary));
     if(item.depends_on.length)lines.push('- Dipendenze: '+item.depends_on.map(md).join(', '));
     if(item.evidence.length)lines.push('- Evidenze:',...item.evidence.map(e=>
-      '  - '+where(e)+(e.sha256?' (SHA-256 '+md(e.sha256.slice(0,12))+'…)':' (hash non disponibile)')));
+      '  - '+where(e)+(e.line?':'+e.line+(e.end_line&&e.end_line>e.line?'-'+e.end_line:''):'')+
+      (e.sha256?' (SHA-256 '+md(e.sha256.slice(0,12))+'…)':' (hash non disponibile)')));
     if(item.proposed_steps.length)lines.push('- Interventi proposti:',...item.proposed_steps.map(x=>'  - '+md(x)));
     if(item.risk_notes.length)lines.push('- Limiti e rischi:',...item.risk_notes.map(x=>'  - '+md(x)));
     const issues=selection.blockers.filter(b=>b.id===item.id);

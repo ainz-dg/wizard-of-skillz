@@ -23,9 +23,9 @@ import {overviewActions,activeOverviewChoice,moveOverviewChoice} from './tui-men
 import {wrapTuiLines,evidenceDetailLines} from './tui-readable.mjs';
 import {reviewWindow,reviewRow,draftInstructions,renderReviewWorkspace} from './tui-review-layout.mjs';
 import {decorateWizardOverview} from './tui-brand.mjs';
-import {agentProviders,loadWizardSkill} from './agent-harness.mjs';
+import {agentProviders,loadWizardSkill,sanitizeAgentDiagnostic} from './agent-harness.mjs';
 import {agentReviewPrompt,agentRevisionPrompt,parseAgentReview,parseAgentRevision,
-  writeAgentReviewSession,loadAgentOriginal} from './agent-review.mjs';
+  writeAgentReviewSession,preserveUnvalidatedAgentReport,loadAgentOriginal} from './agent-review.mjs';
 import {stageUpdateText} from './review-candidates.mjs';
 
 const CSI='\x1b[';
@@ -212,6 +212,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
   editorConfigured=false,modelConfigured=false,
   providerPickerEnabled=false,providerSelection=null,providerWizard=null,domainWizard=null,
   projectWizard=null,agentWizard=null,agentQuestion=null,agentReview=null,
+  agentError=null,
   agentConfigured=false,agentProvider='Codex CLI',
   projectRoot=null,canChooseProject=false,canUseDomain=false}={}){
   // Honor the reported viewport height, including blank padding and footer.
@@ -241,6 +242,7 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
     lines.push(fmt('Modello: '+providerDescription(providerSelection),'gray'));
   if(agentWizard){
     lines.push('',fmt('REVISIONE AGENT-FIRST · Harness utente','cyan'));
+    if(agentWizard.notice)lines.push(fmt(agentWizard.notice,'yellow'));
     if(agentWizard.step==='provider'){
       lines.push(fmt('Scegli un harness disponibile. Nessuna invocazione prima della conferma.','bold'),
         ...agentProviders().map((provider,index)=>fmt((index+1)+'  '+provider.label+
@@ -462,6 +464,17 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
       for(const item of agentReview.unsupported_actions)
         lines.push(fmt('• '+item.action+' · '+item.title+' — leggibile nel report, non applicabile qui.','yellow'));
     }
+  }else if(state.view==='agent-error'){
+    const detail=String(agentError?.message??'Errore agentico senza dettagli.');
+    const detailLines=wrapTuiLines(detail.split(/\r?\n/),Math.max(20,width-4));
+    const start=Math.max(0,Math.min(state.scroll??0,Math.max(0,detailLines.length-8)));
+    lines.push(fmt('AGENT-FIRST · REPORT NON IMPORTATO','red'),
+      fmt('Nessuna proposta importata o applicabile.','yellow'),
+      fmt('Dettaglio '+(start+1)+'–'+Math.min(detailLines.length,start+8)+'/'+detailLines.length+
+        ' · ↑↓ per leggere','gray'));
+    for(const line of detailLines.slice(start,start+8))lines.push(fmt(line,'bold'));
+    if(agentError?.reportPath)lines.push('',fmt('Report originale conservato fuori dal progetto:','yellow'),
+      fmt(agentError.reportPath,'gray'));
   }else if(state.view==='list'){
     const query=state.searching?state.searchDraft:state.search;
     const ready=items.filter(item=>item.readiness==='PREVIEW_READY').length;
@@ -656,7 +669,11 @@ export function renderReviewTui(catalog,state,{previews=null,scopeHints=null,sou
        item.summary,
        '',
        'EVIDENZE INCLUSE',
-       ...(item.evidence||[]).map(e=>'  '+source(e)+(e.sha256?'  sha256 '+e.sha256:'')),
+       ...(item.evidence||[]).flatMap(e=>[
+         '  '+source(e)+(e.line?':'+e.line+(e.end_line&&e.end_line>e.line?'-'+e.end_line:''):'')+
+           (e.sha256?'  sha256 '+e.sha256:''),
+         ...(e.quote?['    '+e.quote]:[])
+       ]),
        'PASSAGGI PROPOSTI',...(item.proposed_steps||[]).map(s=>'  • '+s),
        'LIMITI',...(item.risk_notes||[]).map(s=>'  • '+s)];
     // Lifecycle paths may contain spaces: fixed-width wrapping preserves every byte.
@@ -723,6 +740,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       skill_sha256:metadata.skill_sha256??null};
   };
   let agentReview=readAgentSession(folder);
+  let agentError=null;
   let agentSelection=agentReview?{provider:agentReview.provider,
     model:agentReview.model==='CLI default'?null:agentReview.model}:null;
   let state=initialTuiState({guided:true});
@@ -752,7 +770,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     modelConfigured:Boolean(consumerRoot && (clientFactory||providerFactory)),
     providerPickerEnabled:typeof providerFactory==='function',
     providerSelection,providerWizard,domainWizard,projectWizard,agentWizard,agentQuestion,
-    agentReview,agentConfigured:typeof agentFactory==='function',
+      agentReview,agentError,agentConfigured:typeof agentFactory==='function',
     agentProvider:agentSelection?.provider==='codex'?'Codex CLI':'coding agent non selezionato',
     projectRoot:consumerRoot,canChooseProject:true,canUseDomain:Boolean(consumerRoot)
   }));
@@ -1079,6 +1097,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
     const controller=new AbortController();activeController=controller;busy=true;
     state.notice='Agent-first in corso · '+agentSelection.provider+' · ESC annulla';
     draw();
+    let rawAgentReport=null;
     try{
       const skillText=loadWizardSkill();
       const auditRoot=fs.realpathSync(folder),selectedRoot=fs.realpathSync(consumerRoot);
@@ -1091,6 +1110,7 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       const result=await activeAgent.reviewWorkspace({workspaceRoot:consumerRoot,
         skillText,prompt,signal:controller.signal});
       if(controller.signal.aborted)throw Error('Agent review cancelled');
+      rawAgentReport=result.report;
       const repoId=extra.localScan?.repository??'local/'+path.basename(consumerRoot);
       const parsed=parseAgentReview(result.report,{workspaceRoot:consumerRoot,repositoryId:repoId});
       const outputDir=fs.mkdtempSync(path.join(fs.realpathSync(folder),'.wizard-agent-review-'));
@@ -1108,13 +1128,27 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
         unsupported_actions:parsed.unsupported_actions,folder};
       agentSelection={provider:result.provider,
         model:result.model==='CLI default'?null:result.model};
+      agentError=null;
       state={...initialTuiState({guided:true}),view:'agent-report',scroll:0,
         notice:'Report pronto: '+parsed.total_recommendations+
           ' raccomandazioni; '+saved.proposal_count+
           ' UPDATE preparate come diff da revisionare. Nessuna scrittura nel progetto.'};
     }catch(error){
-      state.notice=controller.signal.aborted?'Revisione agentica annullata; nessun file del progetto modificato.':
-        'AGENT REVIEW: '+error.message;
+      if(controller.signal.aborted){
+        state.notice='Revisione agentica annullata; nessun file del progetto modificato.';
+      }else{
+        let reportPath=null,message=sanitizeAgentDiagnostic(error.message);
+        if(rawAgentReport){
+          try{
+            const outputDir=fs.mkdtempSync(path.join(fs.realpathSync(folder),'.wizard-agent-unvalidated-'));
+            fs.chmodSync(outputDir,0o700);
+            reportPath=preserveUnvalidatedAgentReport(outputDir,rawAgentReport,{consumerRoot});
+          }catch(saveError){message+='\nOriginal report could not be preserved: '+
+            sanitizeAgentDiagnostic(saveError.message);}
+        }
+        agentError={message,reportPath};
+        state={...state,view:'agent-error',scroll:0,notice:''};
+      }
     }finally{
       activeController=null;activeAgent=null;agentWizard=null;busy=false;draw();
     }
@@ -1132,7 +1166,8 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       agentWizard={...agentWizard,step:'model',text:'',codexAvailable:true,
         account:status.auth,version:status.version,notice:''};
     }catch(error){
-      agentWizard={...agentWizard,codexAvailable:false,notice:'Codex non pronto: '+error.message};
+      agentWizard={...agentWizard,codexAvailable:false,
+        notice:'Codex non pronto: '+sanitizeAgentDiagnostic(error.message)};
     }finally{busy=false;draw();}
   };
   const agentWizardKey=(ch,command)=>{
@@ -1199,7 +1234,8 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       }
     }catch(error){
       agentQuestion={...current,notice:controller.signal.aborted?
-        'Richiesta annullata. La bozza precedente è invariata.':error.message};
+        'Richiesta annullata. La bozza precedente è invariata.':
+          sanitizeAgentDiagnostic(error.message)};
     }finally{activeController=null;busy=false;draw();}
   };
   const agentQuestionKey=(ch,command)=>{
@@ -1407,6 +1443,12 @@ export async function runReviewTui(folder,{input=process.stdin,output=process.st
       else if(command==='n')beginAgent();
       else if(command==='up'||command==='down')
         state={...state,scroll:Math.max(0,(state.scroll??0)+(command==='up'?-1:1))};
+      draw();return;
+    }
+    if(state.view==='agent-error'){
+      if(command==='escape'||command==='enter')state={...state,view:'overview',scroll:0};
+      else if(command==='up'||command==='down')state={...state,
+        scroll:Math.max(0,(state.scroll??0)+(command==='up'?-1:1))};
       draw();return;
     }
     if(state.view==='overview'&&['up','down','enter','v'].includes(command)){
