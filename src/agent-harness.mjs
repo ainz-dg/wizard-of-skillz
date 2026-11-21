@@ -115,7 +115,7 @@ export class CodexAgentAdapter{
     try{
       const args=['--ask-for-approval','never','exec','--sandbox','read-only',
         '--ephemeral','--cd',root,'--output-last-message',answer];
-      if(!hasGitMetadata(root))args.splice(2,0,'--skip-git-repo-check');
+      if(!hasGitMetadata(root))args.splice(args.indexOf('exec')+1,0,'--skip-git-repo-check');
       if(this.model)args.push('--model',this.model);
       args.push('-');
       await this.run('codex',args,{cwd:root,input:prompt,timeoutMs:this.timeoutMs,signal});

@@ -51,7 +51,9 @@ test("Codex adapter keeps the user's CLI account and requests read-only ephemera
   assert.equal(calls[0].options.cwd,fs.realpathSync(root));
   assert.match(calls[0].options.input,/Audit only/);
   assert.match(calls[0].options.input,/SPECIALIST SKILL/);
-  assert.ok(calls[0].args.includes('--skip-git-repo-check'));
+  const execIndex=calls[0].args.indexOf('exec');
+  assert.notEqual(execIndex,-1);
+  assert.equal(calls[0].args[execIndex+1],'--skip-git-repo-check');
   fs.mkdirSync(path.join(root,'.git'));
   await adapter.reviewWorkspace({workspaceRoot:root,skillText,prompt});
   assert.equal(calls[1].args.includes('--skip-git-repo-check'),false);
