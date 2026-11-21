@@ -19,6 +19,7 @@
     "bin/",
     "src/",
     "prompts/",
+    "skills/wizard-of-skillz/",
     "docs/TUI-QUICKSTART.md",
     "docs/OLLAMA.md",
     "docs/ACKNOWLEDGEMENTS.md",

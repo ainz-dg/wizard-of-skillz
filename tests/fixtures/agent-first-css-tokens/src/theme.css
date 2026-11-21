@@ -1,0 +1,6 @@
+@import "@sample-foundation/theme-tokens/css";
+
+.primary-button {
+  color: var(--sample-color-ink);
+  background: var(--sample-color-action);
+}

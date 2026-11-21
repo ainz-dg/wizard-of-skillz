@@ -5,7 +5,8 @@
 export function commandHints(view,{
   narrow=false,searching=false,modelConfigured=false,providerPickerEnabled=false,
   editorConfigured=false,hasSemanticReport=false,applyConfigured=false,
-  proposalCount=0,twoPane=false,wizardStep=null,wizardProvider=null
+  proposalCount=0,twoPane=false,wizardStep=null,wizardProvider=null,
+  agentConfigured=false
 }={}){
   if(wizardStep==='menu')
     return ['1 Copilot  2 Ollama locale  3 Ollama remoto  4 Codex  5 Claude',
@@ -27,7 +28,7 @@ export function commandHints(view,{
     ]:[
       '↑↓ Scegli un’azione  INVIO Seleziona'+
         (hasSemanticReport?'  J Risultati  K Nuova analisi':modelConfigured?'  K Audit':'')+
-        (providerPickerEnabled?'  L Provider':''),
+        (providerPickerEnabled?'  L Provider':'')+(agentConfigured?'  Agent-first':''),
       'D Dominio  ? Aiuto  Q Esci  ·  Solo G → Y applica'
     ];
   if(view==='list'){
@@ -36,7 +37,7 @@ export function commandHints(view,{
       'ESC Annulla la ricerca'
     ];
     return !twoPane?[
-      '↑↓ Proposta  INVIO Dettaglio  SPAZIO Seleziona',
+      '↑↓ Proposta  INVIO Dettaglio  C Chiarisci  SPAZIO Seleziona',
       (applyConfigured?'G Lotto  ':'G DISABILITATO  ')+'M Proposta AI  ESC'
     ]:[
       'TAB Cambia pannello  ↑↓ Naviga/scorri  INVIO Dettaglio  P Diff',
@@ -66,7 +67,7 @@ export function commandHints(view,{
     'Diagnosi soltanto: non applica modifiche'
   ];
   if(view==='detail')return [
-    '↑↓ Leggi proposta completa  P Diff  ESC Elenco proposte',
+    '↑↓ Leggi proposta completa  P Diff  C Chiarisci  ESC Elenco',
     'M/E per preparare la patch dalla lista  ·  ? Aiuto'
   ];
   if(view==='preview')return [
@@ -89,6 +90,8 @@ export const HELP_LINES=[
   '   E permette una modifica con editor; P mostra il diff. Nessuna scrittura nel progetto.',
   '5. REVISIONE E DECISIONE: leggi tutto il diff, SPAZIO seleziona, G verifica il lotto;',
   '   solo Y, dopo conferma esplicita, scrive nel progetto.',
+  '6. AGENT-FIRST sperimentale: Codex CLI esplora il workspace in sola lettura;',
+  '   le proposte UPDATE sono bozze; C chiede un chiarimento mirato.',
   '',
   'SCORCIATOIE AVANZATE',
   'H/C diagnosi separate · F filtro · / ricerca · X pulisci ricerca.',

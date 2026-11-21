@@ -31,6 +31,9 @@ import { analyzeSkillScope, skillScopeMarkdown, renderScopeReviewSection } from 
 import { resolveInstalledScope } from '../src/skill-install-scope.mjs';
 import { proposeSkillDesignReview, renderSkillDesignDiff } from '../src/skill-design-proposals.mjs';
 import { buildTriage, triageMarkdown } from '../src/triage.mjs';
+import { createAgentHarness } from '../src/agent-harness.mjs';
+
+const interactiveAgentFactory=options=>createAgentHarness(options);
 
 function arg(name, def=null) {
   const i = process.argv.indexOf(name);
@@ -268,6 +271,7 @@ if (!cmd || cmd === 'scan') {
       consumerRoot:root,
       moveDestinationDir:arg('--move-dir'),
       providerFactory:interactiveLlmFactory,
+      agentFactory:interactiveAgentFactory,
       initialProvider:llmOptions()
     });}
     catch(e){fail(e.message);}
@@ -342,6 +346,7 @@ if (cmd === 'tui') {
     providerRoot:providerRoot?assertRepoPath('provider',providerRoot):null,
     moveDestinationDir:arg('--move-dir'),
     providerFactory:interactiveLlmFactory,
+    agentFactory:interactiveAgentFactory,
     initialProvider:llmOptions()
   });} catch(e){fail(e.message);}
   process.exit(0);

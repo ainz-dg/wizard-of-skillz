@@ -1,0 +1,7 @@
+{
+  "name": "sample-theme-app",
+  "private": true,
+  "dependencies": {
+    "@sample-foundation/theme-tokens": "2.1.0"
+  }
+}
